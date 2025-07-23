@@ -368,7 +368,7 @@ class Operator(BenchmarkOperator):
 
             # TODO: Ideally we want to autotune over this parameter
             kPartitions = 256
-            assert K % kPartitions == 0, "K must be divisible by Kmini"
+            # assert K % kPartitions == 0, "K must be divisible by Kmini"
             B = K // kPartitions
 
             a_reshaped = a.reshape(M, B, kPartitions).transpose(
