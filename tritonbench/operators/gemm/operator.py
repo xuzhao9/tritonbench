@@ -293,7 +293,7 @@ class Operator(BenchmarkOperator):
         torch._dynamo.reset()
         with inductor_config.patch(
             max_autotune=True,
-            max_autotune_gemm_backends="TRITON",
+            max_autotune_gemm_backends="ATEN,TRITON",
             autotune_fallback_to_aten=False,
         ):
             if bias is not None:
@@ -348,7 +348,7 @@ class Operator(BenchmarkOperator):
         torch._dynamo.reset()
         with inductor_config.patch(
             max_autotune=True,
-            max_autotune_gemm_backends="CUTLASS",
+            max_autotune_gemm_backends="ATEN,CUTLASS",
             autotune_fallback_to_aten=False,
         ):
             if bias is not None:
