@@ -343,7 +343,7 @@ class Operator(BenchmarkOperator):
             else streamk_cuda_matmul(a, b)
         )
 
-    @register_benchmark(enabled=is_cuda())
+    @register_benchmark(enabled=False)
     def pt2_cutlass_matmul(self, a, b, bias) -> Callable:
         torch._dynamo.reset()
         with inductor_config.patch(
