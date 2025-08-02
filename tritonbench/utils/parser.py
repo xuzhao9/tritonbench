@@ -250,7 +250,6 @@ def get_parser(args=None):
     # A/B Testing parameters
     parser.add_argument(
         "--side-a",
-        "-a",
         type=str,
         default=None,
         help="Configuration A for A/B testing. Specify operator-specific arguments as a string. "
@@ -258,7 +257,6 @@ def get_parser(args=None):
     )
     parser.add_argument(
         "--side-b",
-        "-b", 
         type=str,
         default=None,
         help="Configuration B for A/B testing. Specify operator-specific arguments as a string. "
