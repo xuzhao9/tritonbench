@@ -100,9 +100,11 @@ def update_args_with_global(base_args: argparse.Namespace, global_args: List[str
             if value is not None and key not in ['side_a', 'side_b']:
                 setattr(updated_args, key, value)
                 
-    except SystemExit:
+    except SystemExit as e:
         # If parsing fails, keep original args
-        pass
+        print(f"WARNING: Failed to parse global arguments {global_args}, using original args: {e}")
+    except Exception as e:
+        print(f"WARNING: Unexpected error parsing global arguments {global_args}: {e}")
     
     return updated_args
 
@@ -245,13 +247,16 @@ def compare_ab_results(result_a: BenchmarkOperatorResult, result_b: BenchmarkOpe
     print("=" * 70)
     
     print("Configuration Differences:")
-    differences = _analyze_config_differences(config_a_args, config_b_args)
-    
-    if differences:
-        for param, (val_a, val_b) in differences.items():
-            print(f"  {param:<15}: {val_a:<15} → {val_b}")
-    else:
-        print("  No configuration differences detected")
+    try:
+        differences = _analyze_config_differences(config_a_args, config_b_args)
+        
+        if differences:
+            for param, (val_a, val_b) in differences.items():
+                print(f"  {param:<15}: {val_a:<15} → {val_b}")
+        else:
+            print("  No configuration differences detected")
+    except Exception as e:
+        print(f"  ERROR: Failed to analyze configuration differences: {e}")
     
     print(f"\nTest Scope: {len(common_x_vals)} input shapes, {len(common_backends)} backends")
     print(f"Metrics: {', '.join(result_a.metrics)}")
@@ -347,8 +352,17 @@ def run_ab_test(base_args: argparse.Namespace, base_extra_args: List[str], _run_
     """Run A/B test with two configurations and return both results."""
     
     # Parse A and B configurations
-    config_a_args = parse_ab_config(base_args.side_a)
-    config_b_args = parse_ab_config(base_args.side_b)
+    try:
+        config_a_args = parse_ab_config(base_args.side_a)
+    except ValueError as e:
+        print(f"ERROR: Failed to parse Side A configuration: {e}")
+        raise
+    
+    try:
+        config_b_args = parse_ab_config(base_args.side_b)
+    except ValueError as e:
+        print(f"ERROR: Failed to parse Side B configuration: {e}")
+        raise
     
     print(f"[A/B Test] Configuration A: {' '.join(config_a_args)}")
     print(f"[A/B Test] Configuration B: {' '.join(config_b_args)}")
@@ -376,21 +390,35 @@ def run_ab_test(base_args: argparse.Namespace, base_extra_args: List[str], _run_
     extra_args_b = base_extra_args + op_b_args
     
     print("=" * 60)
-    print(f"Running Configuration A: {' '.join(config_a_args)}")
+    print(f"Running Side A: {' '.join(config_a_args)}")
     if global_a_args:
         print(f"  Global args: {' '.join(global_a_args)}")
     if op_a_args:
         print(f"  Operator args: {' '.join(op_a_args)}")
     print("=" * 60)
-    result_a = _run_func(args_a, extra_args_a)
+    
+    try:
+        result_a = _run_func(args_a, extra_args_a)
+        if not result_a:
+            raise RuntimeError("Side A returned empty result")
+    except Exception as e:
+        print(f"ERROR: Side A failed to run: {e}")
+        raise RuntimeError(f"A/B test failed - Side A error: {e}")
     
     print("\n" + "=" * 60)
-    print(f"Running Configuration B: {' '.join(config_b_args)}")
+    print(f"Running Side B: {' '.join(config_b_args)}")
     if global_b_args:
         print(f"  Global args: {' '.join(global_b_args)}")
     if op_b_args:
         print(f"  Operator args: {' '.join(op_b_args)}")
     print("=" * 60)
-    result_b = _run_func(args_b, extra_args_b)
+    
+    try:
+        result_b = _run_func(args_b, extra_args_b)
+        if not result_b:
+            raise RuntimeError("Side B returned empty result")
+    except Exception as e:
+        print(f"ERROR: Side B failed to run: {e}")
+        raise RuntimeError(f"A/B test failed - Side B error: {e}")
     
     return result_a, result_b
