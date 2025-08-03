@@ -107,26 +107,113 @@ def update_args_with_global(base_args: argparse.Namespace, global_args: List[str
     return updated_args
 
 
+def _analyze_config_differences(config_a_args: List[str], config_b_args: List[str]) -> Dict[str, Tuple[str, str]]:
+    """Analyze differences between two configurations."""
+    # Parse arguments into dictionaries
+    def parse_config_to_dict(args):
+        config_dict = {}
+        i = 0
+        while i < len(args):
+            if args[i].startswith('--'):
+                key = args[i][2:]  # Remove --
+                if '=' in args[i]:
+                    # Format: --key=value
+                    key, value = args[i][2:].split('=', 1)
+                    config_dict[key] = value
+                    i += 1
+                elif i + 1 < len(args) and not args[i + 1].startswith('-'):
+                    # Format: --key value
+                    config_dict[key] = args[i + 1]
+                    i += 2
+                else:
+                    # Flag without value
+                    config_dict[key] = "True"
+                    i += 1
+            else:
+                i += 1
+        return config_dict
+    
+    config_a = parse_config_to_dict(config_a_args)
+    config_b = parse_config_to_dict(config_b_args)
+    
+    # Find differences
+    differences = {}
+    all_keys = set(config_a.keys()) | set(config_b.keys())
+    
+    for key in all_keys:
+        val_a = config_a.get(key, "default")
+        val_b = config_b.get(key, "default")
+        if val_a != val_b:
+            differences[key] = (val_a, val_b)
+    
+    return differences
+
+
+def _calculate_performance_summary(result_a: BenchmarkOperatorResult, result_b: BenchmarkOperatorResult, 
+                                 common_x_vals: List, common_backends: List[str]) -> Dict[str, Dict[str, float]]:
+    """Calculate performance summary statistics."""
+    summary = {}
+    
+    # Create result dictionaries for easier lookup
+    result_dict_a = {x_val: metrics_dict for x_val, metrics_dict in result_a.result}
+    result_dict_b = {x_val: metrics_dict for x_val, metrics_dict in result_b.result}
+    
+    for backend in common_backends:
+        backend_summary = {}
+        
+        for metric in result_a.metrics:
+            improvements = []
+            
+            for x_val in common_x_vals:
+                if (backend in result_dict_a[x_val] and backend in result_dict_b[x_val]):
+                    metrics_a = result_dict_a[x_val][backend]
+                    metrics_b = result_dict_b[x_val][backend]
+                    
+                    val_a = getattr(metrics_a, metric, None)
+                    val_b = getattr(metrics_b, metric, None)
+                    
+                    if val_a is not None and val_b is not None:
+                        # Handle different metric types
+                        if hasattr(val_a, 'p50'):
+                            val_a_num = val_a.p50
+                        else:
+                            val_a_num = val_a
+                        
+                        if hasattr(val_b, 'p50'):
+                            val_b_num = val_b.p50
+                        else:
+                            val_b_num = val_b
+                        
+                        if val_a_num != 0:
+                            improvement = ((val_b_num - val_a_num) / val_a_num) * 100
+                            improvements.append(improvement)
+            
+            if improvements:
+                backend_summary[metric] = {
+                    'avg_improvement': sum(improvements) / len(improvements),
+                    'min_improvement': min(improvements),
+                    'max_improvement': max(improvements),
+                    'count': len(improvements)
+                }
+        
+        summary[backend] = backend_summary
+    
+    return summary
+
+
 def compare_ab_results(result_a: BenchmarkOperatorResult, result_b: BenchmarkOperatorResult, 
                       config_a_args: List[str], config_b_args: List[str]):
-    """Compare A/B test results and display formatted comparison."""
+    """Compare A/B test results"""
     if not result_a or not result_b:
         print("\n[A/B Comparison] ERROR: One or both results are invalid")
         return
-    
-    print("\n" + "=" * 80)
-    print(f"[A/B Test Results Comparison] - {result_a.op_name}")
-    print("=" * 80)
-    print(f"Configuration A: {' '.join(config_a_args)}")
-    print(f"Configuration B: {' '.join(config_b_args)}")
-    print()
     
     # Check if both results have data
     if not result_a.result or not result_b.result:
         print("ERROR: No benchmark data available for comparison")
         return
     
-    # Get all x_vals (input shapes) that are common to both results
+    # Get common data for analysis
     x_vals_a = {x_val for x_val, _ in result_a.result}
     x_vals_b = {x_val for x_val, _ in result_b.result}
     common_x_vals = sorted(x_vals_a.intersection(x_vals_b))
@@ -135,11 +222,10 @@ def compare_ab_results(result_a: BenchmarkOperatorResult, result_b: BenchmarkOpe
         print("ERROR: No common input shapes found between configurations")
         return
     
-    # Create result dictionaries for easier lookup
+    # Get common backends
     result_dict_a = {x_val: metrics_dict for x_val, metrics_dict in result_a.result}
     result_dict_b = {x_val: metrics_dict for x_val, metrics_dict in result_b.result}
     
-    # Get all backends that are common to both results
     all_backends_a = set()
     all_backends_b = set()
     for x_val in common_x_vals:
@@ -151,58 +237,89 @@ def compare_ab_results(result_a: BenchmarkOperatorResult, result_b: BenchmarkOpe
         print("ERROR: No common backends found between configurations")
         return
     
-    print(f"Comparing {len(common_x_vals)} input shapes across {len(common_backends)} backends")
-    print(f"Metrics: {', '.join(result_a.metrics)}")
-    print()
+    # ============================================================================
+    # SECTION 1: Configuration Analysis
+    # ============================================================================
+    print("\n" + "=" * 70)
+    print(f"A/B Test Results: {result_a.op_name}")
+    print("=" * 70)
     
-    # Create comparison table
-    x_val_name = REGISTERED_X_VALS.get(result_a.op_name, "x_val")
+    print("Configuration Differences:")
+    differences = _analyze_config_differences(config_a_args, config_b_args)
+    
+    if differences:
+        for param, (val_a, val_b) in differences.items():
+            print(f"  {param:<15}: {val_a:<15} → {val_b}")
+    else:
+        print("  No configuration differences detected")
+    
+    print(f"\nTest Scope: {len(common_x_vals)} input shapes, {len(common_backends)} backends")
+    print(f"Metrics: {', '.join(result_a.metrics)}")
+    
+    # ============================================================================
+    # SECTION 2: Performance Summary
+    # ============================================================================
+    print("\n" + "-" * 70)
+    print("Performance Summary")
+    print("-" * 70)
+    
+    summary = _calculate_performance_summary(result_a, result_b, common_x_vals, common_backends)
     
     for backend in common_backends:
-        print(f"Backend: {backend}")
-        print("-" * 60)
+        print(f"\n{backend}:")
+        backend_data = summary.get(backend, {})
         
-        # Create table headers
-        headers = [x_val_name]
-        for metric in result_a.metrics:
-            headers.extend([f"{metric}_A", f"{metric}_B", f"{metric}_diff%"])
+        if not backend_data:
+            print("  No comparable data")
+            continue
         
-        # Print headers
-        print("{:<15} ".format(headers[0]), end="")
-        for i in range(1, len(headers)):
-            print("{:<12} ".format(headers[i]), end="")
-        print()
-        print("-" * (15 + 12 * (len(headers) - 1)))
+        for metric, stats in backend_data.items():
+            avg_improvement = stats['avg_improvement']
+            min_improvement = stats['min_improvement'] 
+            max_improvement = stats['max_improvement']
+            
+            print(f"  {metric:<12}: {avg_improvement:+5.1f}% avg [{min_improvement:+.1f}% to {max_improvement:+.1f}%]")
+    
+    # ============================================================================
+    # SECTION 3: Detailed Comparison (Compact)
+    # ============================================================================
+    print("\n" + "-" * 70)
+    print("Detailed Comparison")
+    print("-" * 70)
+    
+    x_val_name = REGISTERED_X_VALS.get(result_a.op_name, "x_val")
+    
+    # Show all metrics for detailed comparison
+    for metric in result_a.metrics:
+        print(f"\nMetric: {metric}")
+        print("Backend".ljust(15), end="")
+        print(x_val_name.ljust(20), end="")
+        print("Config A".ljust(12), end="")
+        print("Config B".ljust(12), end="")
+        print("Difference".ljust(12))
+        print("-" * 71)
         
-        # Print data rows
-        for x_val in common_x_vals:
-            if backend not in result_dict_a[x_val] or backend not in result_dict_b[x_val]:
-                continue
+        for backend in common_backends:
+            first_row = True
+            for x_val in common_x_vals:
+                if backend not in result_dict_a[x_val] or backend not in result_dict_b[x_val]:
+                    continue
+                    
+                metrics_a = result_dict_a[x_val][backend]
+                metrics_b = result_dict_b[x_val][backend]
                 
-            metrics_a = result_dict_a[x_val][backend]
-            metrics_b = result_dict_b[x_val][backend]
-            
-            # Print x_val
-            print("{:<15} ".format(str(x_val)), end="")
-            
-            # Print metrics comparisons
-            for metric in result_a.metrics:
                 val_a = getattr(metrics_a, metric, None)
                 val_b = getattr(metrics_b, metric, None)
                 
                 if val_a is not None and val_b is not None:
-                    # Handle latency objects
+                    # Handle different data types
                     if hasattr(val_a, 'p50'):
                         val_a_num = val_a.p50
-                    else:
-                        val_a_num = val_a
-                    
-                    if hasattr(val_b, 'p50'):
                         val_b_num = val_b.p50
                     else:
+                        val_a_num = val_a
                         val_b_num = val_b
                     
-                    # Calculate percentage difference
                     if val_a_num != 0:
                         diff_pct = ((val_b_num - val_a_num) / val_a_num) * 100
                     else:
@@ -216,13 +333,14 @@ def compare_ab_results(result_a: BenchmarkOperatorResult, result_b: BenchmarkOpe
                         val_a_str = str(val_a_num)
                         val_b_str = str(val_b_num)
                     
-                    print("{:<12} {:<12} {:<12} ".format(
-                        val_a_str, val_b_str, f"{diff_pct:+.1f}%"
-                    ), end="")
-                else:
-                    print("{:<12} {:<12} {:<12} ".format("N/A", "N/A", "N/A"), end="")
-            print()
-        print()
+                    # Print row
+                    backend_name = backend if first_row else ""
+                    print(f"{backend_name:<15}{str(x_val):<20}{val_a_str:<12}{val_b_str:<12}{diff_pct:+5.1f}%")
+                    first_row = False
+            
+            if not first_row:  # Only print separator if we printed data
+                print()
+    
 
 
 def run_ab_test(base_args: argparse.Namespace, base_extra_args: List[str], _run_func) -> Tuple[BenchmarkOperatorResult, BenchmarkOperatorResult]:
