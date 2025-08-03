@@ -50,6 +50,7 @@ def get_parser(args=None):
     )
     parser.add_argument(
         "--warmup",
+        type=int,
         default=DEFAULT_WARMUP,
         help="Num of warmup runs for reach benchmark run.",
     )
