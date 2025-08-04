@@ -246,21 +246,21 @@ def get_parser(args=None):
         default=None,
         help="Name of group for benchmarking.",
     )
-    
+
     # A/B Testing parameters
     parser.add_argument(
         "--side-a",
         type=str,
         default=None,
         help="Configuration A for A/B testing. Specify operator-specific arguments as a string. "
-             "Example: '--side-a \"--max-autotune --dynamic\"'",
+        "Example: '--side-a \"--max-autotune --dynamic\"'",
     )
     parser.add_argument(
         "--side-b",
         type=str,
         default=None,
         help="Configuration B for A/B testing. Specify operator-specific arguments as a string. "
-             "Example: '--side-b \"--dynamic\"'",
+        "Example: '--side-b \"--dynamic\"'",
     )
 
     if is_fbcode():
@@ -284,19 +284,27 @@ def get_parser(args=None):
         print(
             "Neither operator nor operator collection is specified. Running all operators in the default collection."
         )
-    
+
     # A/B Testing validation
     if (args.side_a is not None) != (args.side_b is not None):
-        parser.error("A/B testing requires both --side-a and --side-b arguments to be specified together")
-    
+        parser.error(
+            "A/B testing requires both --side-a and --side-b arguments to be specified together"
+        )
+
     if args.side_a is not None and args.side_b is not None:
         # A/B mode is enabled
         if not args.op:
-            parser.error("A/B testing requires a specific operator (--op) to be specified")
+            parser.error(
+                "A/B testing requires a specific operator (--op) to be specified"
+            )
         if args.op_collection != "default":
-            parser.error("A/B testing is only supported with single operators, not operator collections")
+            parser.error(
+                "A/B testing is only supported with single operators, not operator collections"
+            )
         if "," in args.op:
-            parser.error("A/B testing is only supported with a single operator, not multiple operators")
+            parser.error(
+                "A/B testing is only supported with a single operator, not multiple operators"
+            )
         if args.isolate:
             parser.error("A/B testing is not compatible with --isolate mode")
     return parser
