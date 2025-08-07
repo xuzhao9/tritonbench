@@ -111,7 +111,7 @@ class Operator(BenchmarkOperator):
 
         self.tensor_bytes_limit = get_tensor_bytes_limit(tb_args.test_only)
 
-    @register_benchmark(baseline=True)
+    @register_benchmark()
     def torch_jagged_mean_unbind_torch_mean(
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
@@ -154,6 +154,32 @@ class Operator(BenchmarkOperator):
             )
             / x.offsets().diff().unsqueeze(1)
         )
+
+    @register_benchmark(baseline=True)
+    def torch_segment_reduce(
+        self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
+    ):
+        def _inner():
+            num_rows = len(x.offsets()) - 1
+            out = torch.zeros(
+                (num_rows, M), dtype=x.values().dtype, device=x.values().device
+            )
+
+            for j in range(M):
+                # Get values for this feature column
+                col_values = x.values()[:, j]
+
+                # Use segment_reduce for mean computation
+                segment_result = torch._segment_reduce(
+                    col_values, "mean", offsets=x.offsets(), axis=0, initial=0
+                )
+
+                # segment_result has shape (num_rows,)
+                out[:, j] = segment_result
+
+            return out
+
+        return _inner
 
     @register_benchmark()
     def triton_jagged_mean_simple_fused(
