@@ -144,7 +144,6 @@ def run(args: List[str] = []):
             try:
                 result_a, result_b = run_ab_test(args, extra_args, _run)
                 
-                # Phase 3: Implement A/B comparison output
                 from tritonbench.utils.ab_test import parse_ab_config
                 config_a_args = parse_ab_config(args.side_a)
                 config_b_args = parse_ab_config(args.side_b)
