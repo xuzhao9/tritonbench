@@ -95,31 +95,31 @@ def parse_args(args):
     parser.add_argument(
         "--batch",
         default=1024,
-        type=str,
+        type=int,
         help="Batch size",
     )
     parser.add_argument(
         "--max_seq_len",
         default=1000,
-        type=str,
+        type=int,
         help="Max sequence length for Q",
     )
     parser.add_argument(
         "--dim",
         default=512,
-        type=str,
+        type=int,
         help="Query dimension",
     )
     parser.add_argument(
         "--head",
         default=4,
-        type=str,
+        type=int,
         help="Multi head number",
     )
     parser.add_argument(
         "--kv_len",
         default=None,
-        type=str,
+        type=int,
         help=f"Sequence length for K/V, if None, the tensor will be jagged and have the same length as Q",
     )
     parser.add_argument(
