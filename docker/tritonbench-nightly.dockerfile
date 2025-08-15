@@ -28,7 +28,7 @@ RUN sudo mkdir -p /workspace; sudo chown runner:runner /workspace
 # We assume that the host NVIDIA driver binaries and libraries are mapped to the docker filesystem
 # Install CUDA 12.8 build toolchains
 RUN cd /workspace; mkdir -p pytorch-ci; cd pytorch-ci; wget https://raw.githubusercontent.com/pytorch/pytorch/main/.ci/docker/common/install_cuda.sh
-RUN cd /workspace/pytorch-ci; wget https://raw.githubusercontent.com/pytorch/pytorch/main/.ci/docker/common/install_cudnn.sh && \
+RUN cd /workspace/pytorch-ci; wget https://raw.githubusercontent.com/pytorch/pytorch/main/.ci/docker/common/install_cudnn.sh || true && \
     wget https://raw.githubusercontent.com/pytorch/pytorch/main/.ci/docker/common/install_nccl.sh && \
     wget https://raw.githubusercontent.com/pytorch/pytorch/main/.ci/docker/common/install_cusparselt.sh && \
     mkdir ci_commit_pins && cd ci_commit_pins && \
