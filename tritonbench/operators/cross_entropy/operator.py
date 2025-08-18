@@ -25,6 +25,11 @@ def parse_op_args(args: List[str]):
     parser.add_argument("--B", type=int, default=8, help="Batch size")
     parser.add_argument("--T", type=int, default=2048, help="Sequence length")
     parser.add_argument(
+        "--V",
+        type=int,
+        help="[Optional] Vocabulary size (integer). If not provided, uses v-range",
+    )
+    parser.add_argument(
         "--v-range",
         type=str,
         default="12,18",
@@ -41,13 +46,20 @@ class Operator(BenchmarkOperator):
         args = parse_op_args(self.extra_args)
         self.B = args.B
         self.T = args.T
+        self.V = args.V
         start, end = map(int, args.v_range.split(","))
         self.v_range = range(start, end)
         self.baseline_model = CrossEntropyLoss()
         self.liger_model = LigerCrossEntropyLoss()
 
     def get_input_iter(self) -> Generator:
-        for V in [2**i for i in self.v_range]:
+        # If V is provided, use only that value; otherwise use the v_range logic
+        if self.V is not None:
+            V_values = [self.V]
+        else:
+            V_values = [2**i for i in self.v_range]
+        
+        for V in V_values:
             _input = torch.randn(
                 self.B * self.T,
                 V,
