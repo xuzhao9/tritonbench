@@ -1,4 +1,5 @@
-from typing import Callable, List
+import argparse
+from typing import Callable, List, Optional
 
 import torch
 import torch.nn.functional as F
@@ -10,9 +11,26 @@ from tritonbench.utils.triton_op import (
     Mode,
     register_benchmark,
     register_metric,
+    register_x_val,
 )
 
 from . import tutorial
+
+
+def parse_op_args(args: List[str]):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--M",
+        type=int,
+        default=4096,
+        help="[Optional] Size of dimension 0 in input shape (integer), default: 4096",
+    )
+    parser.add_argument(
+        "--N",
+        type=int,
+        help="[Optional] Size of dimension 1 in input shape (integer)",
+    )
+    return parser.parse_args(args)
 
 try:
     from liger_kernel.ops.layer_norm import LigerLayerNormFunction
@@ -24,6 +42,13 @@ except ModuleNotFoundError:
 
 
 class Operator(BenchmarkOperator):
+    def __init__(
+        self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
+    ):
+        super().__init__(tb_args, extra_args)
+        args = parse_op_args(self.extra_args)
+        self.M = args.M
+        self.N = args.N
     @register_benchmark()
     def triton_layer_norm(self, *args):
         return lambda: tutorial.layer_norm(*args)
@@ -64,10 +89,16 @@ class Operator(BenchmarkOperator):
         return [x]
 
     def get_input_iter(self):
-        M = 4096
         eps = 1e-5
-        for N in [512 * i for i in range(2, 32)]:
-            x_shape = (M, N)
+        
+        # If N is provided, use only that value; otherwise use the default range
+        if self.N is not None:
+            N_values = [self.N]
+        else:
+            N_values = [512 * i for i in range(2, 32)]
+        
+        for N in N_values:
+            x_shape = (self.M, N)
             w_shape = (x_shape[-1],)
             x = -2.3 + 0.5 * torch.randn(
                 x_shape,
@@ -83,9 +114,10 @@ class Operator(BenchmarkOperator):
             )
             yield (x, w_shape, weight, bias, eps)
 
+    @register_x_val(label="(M, N)")
     def get_x_val(self, args):
-        _, N = args[0].shape
-        return N
+        M, N = args[0].shape
+        return (M, N)
 
     @register_metric()
     def gbps(self, fn, args, metrics: BenchmarkOperatorMetrics) -> float:
@@ -114,7 +146,7 @@ class Operator(BenchmarkOperator):
                 styles=[("blue", "-"), ("green", "-")],
                 ylabel="GB/s",
                 plot_name="layer-norm-fwd",
-                args={"M": 4096},
+                args={"M": self.M},
             )
         )
         def _plot(M, N, provider):
