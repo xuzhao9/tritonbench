@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import torch
 import triton
+from torch._inductor.runtime.benchmarking import benchmarker
 
 NS_TO_MS = 1e-6
 
@@ -125,6 +126,47 @@ def _summarize_statistics(times, quantiles, return_mode):
     return getattr(torch, return_mode)(times).item()
 
 
+def _do_bench_inductor(fn, warmup, rep, return_mode="all", grad_to_none=None):
+    """Measure latency using inductor benchmarker.
+
+    This helper translates triton.testing.do_bench's warmup/rep time-based parameters
+    to the inductor benchmarker's iteration-based parameters.
+
+    Args:
+        fn: Function to benchmark
+        warmup: Target warmup time in milliseconds (matches triton.testing.do_bench)
+        rep: Target total measurement time in milliseconds (matches triton.testing.do_bench)
+        grad_to_none: Tensors whose gradients should be cleared before each measurement
+        return_mode: "all" for list of measurements, "min" for single minimum value
+
+    Returns:
+        List of measured times in milliseconds (if return_mode="all") or single float (if return_mode="min").
+    """
+    # First, estimate the runtime to calculate iterations
+    estimate_ms = benchmarker.benchmark_gpu(
+        fn, estimation_iters=5, benchmark_iters=10, return_mode="min"
+    )
+
+    # Calculate number of iterations based on target rep time
+    # Similar to how triton.testing.do_bench calculates iterations
+    if estimate_ms == 0:
+        n_repeat = 100  # Default if function is very fast
+    else:
+        n_repeat = max(1, int(rep / estimate_ms))
+
+    # Calculate warmup iterations
+    n_warmup = max(1, int(warmup / estimate_ms)) if estimate_ms > 0 else 25
+
+    # Use inductor benchmarker
+    return benchmarker.benchmark_gpu(
+        fn,
+        memory_warmup_iters=n_warmup,
+        benchmark_iters=n_repeat,
+        grad_to_none=grad_to_none,
+        return_mode=return_mode,
+    )
+
+
 def _do_bench_cpu(
     fn, warmup, rep=20, grad_to_none=None, quantiles=None, return_mode="mean"
 ):
@@ -174,8 +216,13 @@ def do_bench_wrapper(
     device: str = "cuda",
     use_cuda_graphs: bool = False,
     bypass_fail: bool = False,
+    latency_measure_mode: str = "triton_do_bench",
 ) -> Optional[Latency]:
-    """Wrapper to triton's do_bench to gain latency."""
+    """Wrapper to triton's do_bench to gain latency.
+
+    Args:
+        latency_measure_mode: Either "triton_do_bench" (default) or "inductor_benchmarker"
+    """
     try:
         if device == "cpu":
             return Latency(
@@ -198,8 +245,15 @@ def do_bench_wrapper(
                     )
                 )
         else:
+            # Choose the appropriate benchmarking function
+            bench_fn = (
+                _do_bench_inductor
+                if latency_measure_mode == "inductor_benchmarker"
+                else triton.testing.do_bench
+            )
+
             return Latency(
-                times=triton.testing.do_bench(
+                times=bench_fn(
                     fn,
                     warmup=warmup,
                     rep=rep,

@@ -1230,6 +1230,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                     device=self.device,
                     use_cuda_graphs=self.use_cuda_graphs,
                     bypass_fail=self.tb_args.bypass_fail,
+                    latency_measure_mode=self.tb_args.latency_measure_mode,
                 )
             if {
                 "gpu_peak_mem",
