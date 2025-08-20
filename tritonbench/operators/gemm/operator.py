@@ -322,7 +322,7 @@ class Operator(BenchmarkOperator):
         return lambda: compiled(a, b)
 
     @register_benchmark(enabled=not is_cuda())
-    def streamk_matmul(self, a, b, bias) -> Callable:
+    def streamk_matmul_amd(self, a, b, bias) -> Callable:
         return (
             lambda: streamk_amd_matmul(a, b, bias) if bias else streamk_amd_matmul(a, b)
         )
