@@ -16,6 +16,13 @@ try:
 except ModuleNotFoundError:
     LigerCrossEntropyLoss = None
 
+try:
+    from quack.cross_entropy import cross_entropy as quack_cross_entropy
+    HAS_QUACK = True
+except (ModuleNotFoundError, ImportError):
+    quack_cross_entropy = None
+    HAS_QUACK = False
+
 # Reference: https://github.com/linkedin/Liger-Kernel/
 # blob/main/benchmark/scripts/benchmark_cross_entropy.py
 
@@ -83,6 +90,10 @@ class Operator(BenchmarkOperator):
     def inductor_cross_entropy_loss(self, input, target) -> Callable:
         compiled = torch.compile(self.baseline_model, dynamic=False, mode="max-autotune-no-cudagraphs")
         return lambda: compiled(input, target)
+
+    @register_benchmark(enabled=HAS_QUACK)
+    def quack_cross_entropy_loss(self, input, target) -> Callable:
+        return lambda: quack_cross_entropy(input, target)
 
     @register_x_val(label="(B, T, V)")
     def get_x_val(self, example_inputs) -> Tuple[int, int, int]:
