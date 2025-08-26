@@ -160,7 +160,7 @@ class Operator(BenchmarkOperator):
         self.head = args.head
         self.kv_len = args.kv_len
 
-    @register_benchmark(enabled=True)
+    @register_benchmark(baseline=True)
     def gdpa(
         self,
         _config_name,
