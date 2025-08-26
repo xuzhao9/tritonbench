@@ -33,22 +33,22 @@ import triton.language as tl
 
 @triton.autotune(
     configs=[
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 128,
-                "BLOCK_SIZE_N": 128,
-                "BLOCK_SIZE_K": 32,
-                "NUM_SM": 84,
-            }
-        ),
-        triton.Config(
-            {
-                "BLOCK_SIZE_M": 128,
-                "BLOCK_SIZE_N": 128,
-                "BLOCK_SIZE_K": 32,
-                "NUM_SM": 128,
-            }
-        ),
+        # triton.Config(
+        #     {
+        #         "BLOCK_SIZE_M": 128,
+        #         "BLOCK_SIZE_N": 128,
+        #         "BLOCK_SIZE_K": 32,
+        #         "NUM_SM": 84,
+        #     }
+        # ),
+        # triton.Config(
+        #     {
+        #         "BLOCK_SIZE_M": 128,
+        #         "BLOCK_SIZE_N": 128,
+        #         "BLOCK_SIZE_K": 32,
+        #         "NUM_SM": 128,
+        #     }
+        # ),
         triton.Config(
             {
                 "BLOCK_SIZE_M": 64,

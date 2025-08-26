@@ -154,7 +154,8 @@ class Operator(BenchmarkOperator):
     ):
         super().__init__(tb_args, extra_args)
         args = parse_op_args(self.extra_args)
-        self.input_dim = args.input_dim
+        # self.input_dim = args.input_dim
+        self.input_dim = 2
         self.reduce_dim = args.reduce_dim
         self.sum_then_buffer = args.sum_then_buffer
         self.M = args.M
