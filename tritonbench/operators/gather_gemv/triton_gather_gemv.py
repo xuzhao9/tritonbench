@@ -22,22 +22,22 @@ assert_size_stride = torch._C._dynamo.guards.assert_size_stride
             num_stages=1,
             num_warps=8,
         ),
-        triton.Config(
-            {
-                "XBLOCK": 64,
-                "RBLOCK": 8,
-            },
-            num_stages=1,
-            num_warps=8,
-        ),
-        triton.Config(
-            {
-                "XBLOCK": 64,
-                "RBLOCK": 4,
-            },
-            num_stages=1,
-            num_warps=8,
-        ),
+        # triton.Config(
+        #     {
+        #         "XBLOCK": 64,
+        #         "RBLOCK": 8,
+        #     },
+        #     num_stages=1,
+        #     num_warps=8,
+        # ),
+        # triton.Config(
+        #     {
+        #         "XBLOCK": 64,
+        #         "RBLOCK": 4,
+        #     },
+        #     num_stages=1,
+        #     num_warps=8,
+        # ),
         triton.Config(
             {
                 "XBLOCK": 8,
@@ -46,22 +46,22 @@ assert_size_stride = torch._C._dynamo.guards.assert_size_stride
             num_stages=1,
             num_warps=8,
         ),
-        triton.Config(
-            {
-                "XBLOCK": 8,
-                "RBLOCK": 256,
-            },
-            num_stages=1,
-            num_warps=8,
-        ),
-        triton.Config(
-            {
-                "XBLOCK": 64,
-                "RBLOCK": 64,
-            },
-            num_stages=1,
-            num_warps=8,
-        ),
+        # triton.Config(
+        #     {
+        #         "XBLOCK": 8,
+        #         "RBLOCK": 256,
+        #     },
+        #     num_stages=1,
+        #     num_warps=8,
+        # ),
+        # triton.Config(
+        #     {
+        #         "XBLOCK": 64,
+        #         "RBLOCK": 64,
+        #     },
+        #     num_stages=1,
+        #     num_warps=8,
+        # ),
     ],
     key=["xnumel", "rnumel"],
 )

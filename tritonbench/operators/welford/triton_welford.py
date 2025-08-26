@@ -25,14 +25,14 @@ reinterpret_tensor = torch.ops.inductor._reinterpret_tensor
             num_stages=1,
             num_warps=8,
         ),
-        triton.Config(
-            {
-                "XBLOCK": 1,
-                "RBLOCK": 2048,
-            },
-            num_stages=1,
-            num_warps=8,
-        ),
+        # triton.Config(
+        #     {
+        #         "XBLOCK": 1,
+        #         "RBLOCK": 2048,
+        #     },
+        #     num_stages=1,
+        #     num_warps=8,
+        # ), 
     ],
     key=["xnumel", "rnumel"],
 )
@@ -112,14 +112,14 @@ def triton_red_fused_native_layer_norm_0(
 
 @triton.autotune(
     configs=[
-        triton.Config(
-            {
-                "XBLOCK": 1,
-                "RBLOCK": 1024,
-            },
-            num_stages=1,
-            num_warps=8,
-        ),
+        # triton.Config(
+        #     {
+        #         "XBLOCK": 1,
+        #         "RBLOCK": 1024,
+        #     },
+        #     num_stages=1,
+        #     num_warps=8,
+        # ),
         triton.Config(
             {
                 "XBLOCK": 1,

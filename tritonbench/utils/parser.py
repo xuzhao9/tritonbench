@@ -262,6 +262,12 @@ def get_parser(args=None):
         help="Configuration B for A/B testing. Specify operator-specific arguments as a string. "
         "Example: '--side-b \"--dynamic\"'",
     )
+    parser.add_argument(
+        "--no-listener",
+        action="store_true",
+        help="Disable the triton launch listener ",
+        default=False,
+    )
 
     if is_fbcode():
         parser.add_argument("--log-scuba", action="store_true", help="Log to scuba.")

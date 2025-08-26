@@ -175,15 +175,30 @@ def _gdpa_fwd_inner_ws(
 # the code below and commenting out the equivalent parameters is convenient for
 # re-tuning.
 configs = [
+    # triton_config(
+    #     {"BLOCK_M": BM, "BLOCK_N": BN, "NUM_CONSUMER_GROUPS": 1},
+    #     num_stages=s,
+    #     num_warps=w,
+    # )
+    # for BM in [32, 64, 128]  # [32, 64, 128, 256]
+    # for BN in [32, 64, 128]  # 32, 64, 128]
+    # for s in ([1, 2] if is_hip() else [1, 3])  # 3, 4, 7])
+    # for w in [4, 8]  # 4, 8]
     triton_config(
-        {"BLOCK_M": BM, "BLOCK_N": BN, "NUM_CONSUMER_GROUPS": 1},
-        num_stages=s,
-        num_warps=w,
+        {"BLOCK_M": 64, "BLOCK_N": 64, "NUM_CONSUMER_GROUPS": 1},
+        num_stages=3,
+        num_warps=4,
+    ),
+    triton_config(
+        {"BLOCK_M": 128, "BLOCK_N": 64, "NUM_CONSUMER_GROUPS": 1},
+        num_stages=3,
+        num_warps=8,
+    ),
+    triton_config(
+        {"BLOCK_M": 128, "BLOCK_N": 32, "NUM_CONSUMER_GROUPS": 1},
+        num_stages=3,
+        num_warps=4,
     )
-    for BM in [32, 64, 128]  # [32, 64, 128, 256]
-    for BN in [32, 64, 128]  # 32, 64, 128]
-    for s in ([1, 2] if is_hip() else [1, 3])  # 3, 4, 7])
-    for w in [4, 8]  # 4, 8]
 ]
 
 

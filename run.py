@@ -9,7 +9,7 @@ import argparse
 import os
 import shlex
 import sys
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from tritonbench.operator_loader import get_op_loader_bench_cls_by_name, is_loader_op
 
@@ -100,6 +100,62 @@ def _run(args: argparse.Namespace, extra_args: List[str]) -> BenchmarkOperatorRe
         return metrics
 
 
+from triton.knobs import JITHook, LaunchHook
+class JITHookImpl(JITHook):
+    """
+    JIT Hook implementation that overrides or sets the launch_metadata function for Triton kernels.
+
+    This hook is essential for capturing detailed kernel launch information beyond the basic
+    metadata (like kernel name) that Triton provides by default. Without setting a custom
+    launch_metadata function, only minimal launch information is available as shown in:
+    https://github.com/triton-lang/triton/blob/7ce287dc24b43476cdeb30529089ac361564505d/python/triton/compiler/compiler.py#L504
+
+    By intercepting the JIT compilation process and setting a custom launch_metadata function,
+    we can capture comprehensive runtime information including grid parameters, kernel metadata,
+    and argument dictionaries for detailed analysis and logging.
+    """
+
+    def __call__(
+        self,
+        *,
+        key: str,
+        repr: str,
+        fn,
+        compile,
+        is_manual_warmup: bool,
+        already_compiled: bool,
+    ) -> Optional[bool]:
+        """
+        Override or set the launch_metadata function for the JIT-compiled kernel.
+
+        This method is called during the JIT compilation process and allows us to
+        inject our custom launch_metadata function that will be used to collect
+        detailed kernel launch information.
+
+        Args:
+            key: Unique identifier for the kernel
+            repr: String representation of the kernel
+            fn: The JIT function object
+            compile: Compilation function
+            is_manual_warmup: Whether this is a manual warmup call
+            already_compiled: Whether the kernel is already compiled
+
+        Returns:
+            True to continue with compilation, None/False to skip
+        """
+        # Check kernel allowlist early to avoid unnecessary work
+
+        # Get the current launch_metadata function if it exists
+        current_launch_metadata = getattr(fn.jit_function, "launch_metadata", None)
+        if current_launch_metadata is not None:
+            print(
+                f"fn {fn} launch_metadata is not None: {current_launch_metadata}. It will be overridden by tritonparse."
+            )
+        fn.jit_function.launch_metadata = None
+        return True
+
+
+
 def run(args: List[str] = []):
     if args == []:
         args = sys.argv[1:]
@@ -113,6 +169,11 @@ def run(args: List[str] = []):
     args, extra_args = parser.parse_known_args(args)
 
     tritonparse_init(args.tritonparse)
+    if args.no_listener:
+        from triton import knobs
+        jit_hook = JITHookImpl()
+        knobs.runtime.jit_post_compile_hook = jit_hook
+
     if args.op:
         ops = args.op.split(",")
     else:
