@@ -61,6 +61,6 @@ def tritonparse_parse(tritonparse_log_path):
         try:
             from tritonparse.utils import unified_parse
 
-            unified_parse(f"{tritonparse_log_path}/raw_logs", f"{tritonparse_log_path}/parsed_logs")
+            unified_parse(f"{tritonparse_log_path}/raw_logs", f"{tritonparse_log_path}/parsed_logs", overwrite=True)
         except Exception as e:
             print(f"Warning: Failed to parse tritonparse log: {e}")

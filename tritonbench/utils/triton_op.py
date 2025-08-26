@@ -79,7 +79,7 @@ class BenchmarkOperatorBackend:
 
 
 DEFAULT_WARMUP = 25
-DEFAULT_RUN_ITERS = 100
+DEFAULT_RUN_ITERS = 20
 DEFAULT_QUANTILES = [0.5, 0.1, 0.9]
 REGISTERED_BENCHMARKS: Dict[str, OrderedDict[str, BenchmarkOperatorBackend]] = {}
 REGISTERED_METRICS: defaultdict[str, List[str]] = defaultdict(list)
