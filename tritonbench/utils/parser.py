@@ -1,7 +1,7 @@
 import argparse
 
 from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS, is_fbcode
-from tritonbench.utils.triton_op import DEFAULT_RUN_ITERS, DEFAULT_WARMUP
+from tritonbench.utils.triton_op import DEFAULT_REP, DEFAULT_WARMUP
 
 
 def get_parser(args=None):
@@ -52,13 +52,13 @@ def get_parser(args=None):
         "--warmup",
         type=int,
         default=DEFAULT_WARMUP,
-        help="Num of warmup runs for reach benchmark run.",
+        help="Num of warmup runs for each benchmark run.",
     )
     parser.add_argument(
-        "--iter",
+        "--rep",
         type=int,
-        default=DEFAULT_RUN_ITERS,
-        help="Num of reps for each benchmark run.",
+        default=DEFAULT_REP,
+        help="The rep time for each benchmark run.",
     )
     parser.add_argument(
         "--csv",
