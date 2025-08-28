@@ -17,6 +17,10 @@ from tritonbench.utils.triton_op import (
 
 from .tutorial import matmul as tutorial_matmul
 
+torch._dynamo.config.recompile_limit = (
+    10000  # Set high recompile limit to allow for exhausting autotuning
+)
+
 logger = logging.getLogger(__name__)
 try:
     from .persistent import (
