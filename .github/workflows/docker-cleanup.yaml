@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   schedule:
     # Automatically cleanup the nightly Docker images every 3 months
-    - cr 1 */3 *'
+    - cron: '0 0 1 */3 *'
 
 jobs:
   clean-push-docker:
