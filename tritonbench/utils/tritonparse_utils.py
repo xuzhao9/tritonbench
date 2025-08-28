@@ -11,14 +11,9 @@ def tritonparse_init(tritonparse_log_path):
     """Initializes TritonParse structured logging.
 
         This function sets up the logging hook to capture Triton compilation
-    <<<<<<< HEAD
-        and launch events. For more details, see:
-        https://github.com/meta-pytorch/tritonparse
-    =======
         and launch events. The logs will be stored in a 'raw_logs' subdirectory
         within the specified path. For more details, see:
         https://github.com/pytorch-labs/tritonparse
-    >>>>>>> bbb70b4 (# PR Summary: Improve TritonParse Log Organization)
 
         Args:
             tritonparse_log_path (str or None): The path to the directory where
