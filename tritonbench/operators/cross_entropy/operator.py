@@ -56,8 +56,8 @@ class Operator(BenchmarkOperator):
         self.V = args.V
         start, end = map(int, args.v_range.split(","))
         self.v_range = range(start, end)
-        self.baseline_model = CrossEntropyLoss()
-        self.liger_model = LigerCrossEntropyLoss()
+        self.baseline_model = CrossEntropyLoss(reduction='none')
+        self.liger_model = LigerCrossEntropyLoss(reduction='none')
 
     def get_input_iter(self) -> Generator:
         # If V is provided, use only that value; otherwise use the v_range logic
@@ -102,6 +102,9 @@ class Operator(BenchmarkOperator):
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         y = fwd_fn()
+        # For per-sample losses, we need to sum before backward
+        if y.dim() > 0:
+            y = y.sum()
         # TODO: how to pass grad_to_none=[_input]?
         return lambda: y.backward(retain_graph=True)
 
