@@ -415,8 +415,7 @@ class Operator(BenchmarkOperator):
                 with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
                     return sdpa(q, k, v, is_causal=is_causal)
             except RuntimeError as e:
-                print(f"[SKIP] cuDNN backend failed: {e}")
-                return None
+                raise NotImplementedError(str(e))
 
         return sdpa_fn
 
