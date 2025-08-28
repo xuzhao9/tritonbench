@@ -20,7 +20,7 @@ jobs:
           delete-only-untagged-versions: true
           token: ${{ secrets.TRITONBENCH_ACCESS_TOKEN }}
 
-      - uses: actions/delete-package-versions@v4
+      - uses: actions/delete-package-versions@v5
         with:
           package-name: tritonbench
           package-type: container
