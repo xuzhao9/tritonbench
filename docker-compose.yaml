@@ -1,0 +1,16 @@
+services:
+  tritonbench:
+    image: ghcr.io/meta-pytorch/tritonbench:nightly
+    pull_policy: always
+    volumes:
+      - .:/tritonbench
+    environment:
+      - PYTHONPATH=/tritonbench
+  tritonbench-local:
+    build:
+      context: .
+      dockerfile: docker/tritonbench-nightly.dockerfile
+    volumes:
+      - .:/tritonbench
+    environment:
+      - PYTHONPATH=/tritonbench
