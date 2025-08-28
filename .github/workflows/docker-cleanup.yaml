@@ -13,13 +13,6 @@ jobs:
     runs-on: linux.2xlarge
     environment: docker-s3-upload
     steps:
-      - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: meta-pytorch
-          password: ${{ secrets.TRITONBENCH_ACCESS_TOKEN }}
       - uses: actions/delete-package-versions@v4
         with:
           package-name: tritonbench
