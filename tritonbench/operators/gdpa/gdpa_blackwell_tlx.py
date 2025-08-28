@@ -5,11 +5,15 @@ import math
 import torch
 import triton
 import triton.language as tl
-import triton.language.extra.tlx as tlx
 from triton.tools.tensor_descriptor import TensorDescriptor
+
+from tritonbench.utils import has_tlx
 
 from .gdpa_utils import get_num_sms
 from .math import activation_string_to_int
+
+if has_tlx():
+    import triton.language.extra.tlx as tlx
 
 
 def _host_descriptor_pre_hook(nargs):

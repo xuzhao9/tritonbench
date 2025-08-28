@@ -3,8 +3,12 @@ import torch
 
 import triton
 import triton.language as tl
-import triton.language.extra.tlx as tlx
 from triton.tools.tensor_descriptor import TensorDescriptor
+
+from tritonbench.utils import has_tlx
+
+if has_tlx():
+    import triton.language.extra.tlx as tlx
 
 
 def get_cuda_autotune_config():
