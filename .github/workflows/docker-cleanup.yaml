@@ -15,14 +15,16 @@ jobs:
     steps:
       - uses: actions/delete-package-versions@v4
         with:
+          owner: meta-pytorch
           package-name: tritonbench
-          package-type: container
+          package-type: docker
           delete-only-untagged-versions: true
           token: ${{ secrets.TRITONBENCH_ACCESS_TOKEN }}
-      - uses: actions/delete-package-versions@v5
+      - uses: actions/delete-package-versions@v4
         with:
+          owner: meta-pytorch
           package-name: tritonbench
-          package-type: container
+          package-type: docker
           min-versions-to-keep: 200
           token: ${{ secrets.TRITONBENCH_ACCESS_TOKEN }}
 
