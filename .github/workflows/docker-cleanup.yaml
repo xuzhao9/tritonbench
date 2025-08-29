@@ -7,10 +7,6 @@ on:
     # Automatically cleanup the nightly Docker images every 3 months
     - cron: '0 0 1 */3 *'
 
-permissions:
-  contents: read
-  packages: delete  # Required for deleting packages
-
 jobs:
   clean-push-docker:
     if: ${{ github.repository_owner == 'meta-pytorch' }}
