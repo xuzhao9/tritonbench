@@ -12,7 +12,7 @@ jobs:
     if: ${{ github.repository_owner == 'meta-pytorch' }}
     runs-on: linux.2xlarge
     permissions:
-      packages: delete
+      packages: write
     environment: docker-s3-upload
     steps:
       - uses: actions/delete-package-versions@v4
