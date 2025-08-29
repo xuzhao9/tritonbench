@@ -55,6 +55,11 @@ except (ImportError, IOError, AttributeError):
 torch.ops.load_library(
     "//deeplearning/fbgemm/fbgemm_gpu/experimental:gen_ai_attention_ops"
 )
+torch.ops.load_library(
+    "//deeplearning/flashinfer/trtllm_kernel_interfaces:trtllm_fmha_pybind"
+)
+
+from .trtllm_utils import trtllm_decode_fmha_func
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -629,3 +634,17 @@ class Operator(BenchmarkOperator):
             k_scale_asm,
             v_scale_asm,
         )
+
+    @register_benchmark()
+    def trtllm_decode_fmha(
+        self,
+        q: torch.Tensor,
+        k_cache: torch.Tensor,
+        v_cache: torch.Tensor,
+        cache_seqlens: torch.Tensor,
+    ) -> Callable:
+        
+        args = trtllm_decode_fmha_func(q, k_cache, v_cache, cache_seqlens)
+        return lambda: torch.ops.trtllm_kernel_interfaces.trtllm_decode_fmha(
+        *args
+    )
