@@ -89,7 +89,8 @@ def _run_one_operator(args: List[str]):
         del op
         tb_args.mode = "bwd"
         if tb_args.op in BWD_ARGS_OPS:
-            extra_args.extend(BWD_ARGS_OPS[tb_args.op])
+            args.extend(BWD_ARGS_OPS[tb_args.op])
+            tb_args, extra_args = parser.parse_known_args(args)
         op = Operator(tb_args=tb_args, extra_args=extra_args)
         op.run()
         check_ci_output(op)
