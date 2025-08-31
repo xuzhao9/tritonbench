@@ -34,9 +34,12 @@ def get_cuda_autotune_config():
                 "BLOCK_M": BM,
                 "BLOCK_N": BN,
                 "NUM_BUFFERS_Q": bq,
-                "NUM_BUFFERS_KV": bk,
+                "NUM_BUFFERS_KV": bkv,
                 "NUM_BUFFERS_QK": bqk,
                 "NUM_BUFFERS_O": bo,
+                "SUBTILING": SUBTILE,
+                "PINGPONG": pp,
+                "ACT_REGS": ar,
             },
             num_warps=4,
             num_stages=1,
@@ -45,9 +48,12 @@ def get_cuda_autotune_config():
         for BM in [256]  # 128 or 256
         for BN in [128]
         for bq in [1]
-        for bk in [3]
+        for bkv in [3]
         for bqk in [1]  # in tmem
         for bo in [1]  # in tmem
+        for SUBTILE in [True]  # doesn't support False
+        for pp in [True, False]
+        for ar in [192, 232]
     ]
 
 
@@ -285,6 +291,9 @@ def gdpa_kernel_tma_ws_blackwell(
     NUM_BUFFERS_KV: tl.constexpr,
     NUM_BUFFERS_QK: tl.constexpr,
     NUM_BUFFERS_O: tl.constexpr,
+    SUBTILING: tl.constexpr,
+    PINGPONG: tl.constexpr,
+    ACT_REGS: tl.constexpr,
 ):
     n_tile_num = tl.cdiv(N_CTX, BLOCK_M)
     prog_id = tl.program_id(0)
@@ -375,7 +384,7 @@ def gdpa_kernel_tma_ws_blackwell(
 
     with tlx.async_tasks():
         # activation calculation
-        with tlx.async_task("default", registers=192):
+        with tlx.async_task("default", registers=ACT_REGS):
             accum_cnt = 0
             accum_cnt_outer = 0
             for _ in range(0, tiles_per_sm):
@@ -411,23 +420,38 @@ def gdpa_kernel_tma_ws_blackwell(
                         # qk_view: BLOCK_M // 2, HEAD_DIM
                         qk_view_1st = tlx.subslice(qk_view, 0, HEAD_DIM // 2)
                         qk0 = tlx.local_load(qk_view_1st)
-                        p0 = fast_gelu(qk0)
+                        qk_view_2nd = tlx.subslice(
+                            qk_view, HEAD_DIM // 2, HEAD_DIM // 2
+                        )
+                        qk1 = tlx.local_load(qk_view_2nd)
+                        c1 = 0.0356774081
+                        c0 = 0.7978845608
+                        square = _mul_f32x2(qk0, qk0)
+                        inner = _fma_f32x2(c1, square, c0)
+                        inner0 = _mul_f32x2(inner, qk0)
+                        square = _mul_f32x2(qk1, qk1)
+                        inner = _fma_f32x2(c1, square, c0)
+                        inner1 = _mul_f32x2(inner, qk1)
+
+                        if PINGPONG:
+                            tlx.named_barrier_wait(9, 128)
+                        # p0 = fast_gelu(qk0)
+                        p0 = _fma_f32x2(qk0, tanh_approx_fp32(inner0), qk0)
                         p0 = p0.to(dtype)
                         p0_view = tlx.local_reinterpret(qk_view_1st, dtype)
                         tlx.local_store(p0_view, p0)
 
-                        qk_view_2nd = tlx.subslice(
-                            qk_view, HEAD_DIM // 2, HEAD_DIM // 2
-                        )
-                        qk0 = tlx.local_load(qk_view_2nd)
-                        p0 = fast_gelu(qk0)
-                        p0 = p0.to(dtype)
-                        p0_view = tlx.local_reinterpret(qk_view_2nd, dtype)
-                        tlx.local_store(p0_view, p0)
+                        # p1 = fast_gelu(qk1)
+                        p1 = _fma_f32x2(qk1, tanh_approx_fp32(inner1), qk1)
+                        p1 = p1.to(dtype)
+                        p1_view = tlx.local_reinterpret(qk_view_2nd, dtype)
+                        tlx.local_store(p1_view, p1)
 
                         # p and qk reuse tmem space, single producer commit for p via consumer_release_qk
                         consumer_release_qk_view = tlx.local_view(producer_qk0, bufIdx)
                         tlx.barrier_arrive(consumer_release_qk_view, 1)
+                        if PINGPONG:
+                            tlx.named_barrier_arrive(10, 128)
 
                         # wait for o0, o1 per iteration
                         bufIdx = accum_cnt % NUM_BUFFERS_O
@@ -436,10 +460,12 @@ def gdpa_kernel_tma_ws_blackwell(
                         consumer_o0_view = tlx.local_view(producer_commit_o0, bufIdx)
                         # tl.device_print("default producer_commit_o0", accum_cnt)
                         # tl.device_print("default producer_commit_o0_phase", phase)
-                        tlx.barrier_wait(consumer_o0_view, phase)
+                        # there is no need to wait for o0 at each iteration
+                        # tlx.barrier_wait(consumer_o0_view, phase)
                         accum_cnt += 1
 
                     # epilogue here, load from tmem
+                    # FIXME: wait till o0 is done for the inner loop
                     bufIdx_o_outer, phase_o_outer = _get_bufidx_phase(
                         accum_cnt_outer, NUM_BUFFERS_O
                     )
@@ -472,9 +498,11 @@ def gdpa_kernel_tma_ws_blackwell(
                     accum_cnt_outer += 1
                 tile_idx += num_progs
 
-        with tlx.async_task(num_warps=4, registers=192):
+        with tlx.async_task(num_warps=4, registers=ACT_REGS):
             accum_cnt = 0
             accum_cnt_outer = 0
+            if PINGPONG:
+                tlx.named_barrier_arrive(9, 128)
             for _ in range(0, tiles_per_sm):
                 pid = tile_idx % n_tile_num
                 start_m = pid
@@ -505,32 +533,49 @@ def gdpa_kernel_tma_ws_blackwell(
                         # qk_view: BLOCK_M // 2, HEAD_DIM
                         qk_view_1st = tlx.subslice(qk_view, 0, HEAD_DIM // 2)
                         qk0 = tlx.local_load(qk_view_1st)
-                        p0 = fast_gelu(qk0)
+                        qk_view_2nd = tlx.subslice(
+                            qk_view, HEAD_DIM // 2, HEAD_DIM // 2
+                        )
+                        qk1 = tlx.local_load(qk_view_2nd)
+                        c1 = 0.0356774081
+                        c0 = 0.7978845608
+                        square = _mul_f32x2(qk0, qk0)
+                        inner = _fma_f32x2(c1, square, c0)
+                        inner0 = _mul_f32x2(inner, qk0)
+                        square = _mul_f32x2(qk1, qk1)
+                        inner = _fma_f32x2(c1, square, c0)
+                        inner1 = _mul_f32x2(inner, qk1)
+
+                        if PINGPONG:
+                            tlx.named_barrier_wait(10, 128)
+                        # p0 = fast_gelu(qk0)
+                        p0 = _fma_f32x2(qk0, tanh_approx_fp32(inner0), qk0)
                         p0 = p0.to(dtype)
                         p0_view = tlx.local_reinterpret(qk_view_1st, dtype)
                         tlx.local_store(p0_view, p0)
 
-                        qk_view_2nd = tlx.subslice(
-                            qk_view, HEAD_DIM // 2, HEAD_DIM // 2
-                        )
-                        qk0 = tlx.local_load(qk_view_2nd)
-                        p0 = fast_gelu(qk0)
-                        p0 = p0.to(dtype)
-                        p0_view = tlx.local_reinterpret(qk_view_2nd, dtype)
-                        tlx.local_store(p0_view, p0)
+                        # p1 = fast_gelu(qk1)
+                        p1 = _fma_f32x2(qk1, tanh_approx_fp32(inner1), qk1)
+                        p1 = p1.to(dtype)
+                        p1_view = tlx.local_reinterpret(qk_view_2nd, dtype)
+                        tlx.local_store(p1_view, p1)
 
                         # p and qk reuse tmem space, single producer commit for p via consumer_release_qk
                         consumer_release_qk_view = tlx.local_view(producer_qk1, bufIdx)
                         tlx.barrier_arrive(consumer_release_qk_view, 1)
+                        if PINGPONG:
+                            tlx.named_barrier_arrive(9, 128)
 
                         # wait for o0, o1 per iteration
                         bufIdx = accum_cnt % NUM_BUFFERS_O
                         phase = (accum_cnt // NUM_BUFFERS_O) & 1
                         # consumer wait of o1
                         consumer_o1_view = tlx.local_view(producer_commit_o1, bufIdx)
-                        tlx.barrier_wait(consumer_o1_view, phase)
+                        # there is no need to wait for o1 at each iteration
+                        # tlx.barrier_wait(consumer_o1_view, phase)
                         accum_cnt += 1
                     # epilogue here, load from tmem
+                    # FIXME: wait till o1 is done for the inner loop
                     bufIdx_o_outer, phase_o_outer = _get_bufidx_phase(
                         accum_cnt_outer, NUM_BUFFERS_O
                     )
@@ -1210,15 +1255,16 @@ def gdpa_forward_tlx(
 
     stage = 1  # When supporting causal, change to 3
     extra_kern_args = {}
+    # extra_kern_args["maxnreg"] = 168
     nheads = query.shape[1]
     G = query.shape[1] // key.shape[1]
     assert query.shape[1] % key.shape[1] == 0
     batch_size = BATCH * nheads
     NUM_SMS = (
         get_num_sms() or 1000000
-    ) * 8  # if num sms is None, use a large number so that it is a no-op
-    print("NUM_SMS", NUM_SMS)
-    print(triton.cdiv(max_seq_len_q, 256) * BATCH * nheads)
+    )  # * 8  # if num sms is None, use a large number so that it is a no-op
+    # print("NUM_SMS", NUM_SMS)
+    # print(triton.cdiv(max_seq_len_q, 256) * BATCH * nheads)
 
     q = expect_contiguous(query)
     k = expect_contiguous(key)
@@ -1268,7 +1314,7 @@ def gdpa_forward_tlx(
         )
 
     activation_enum_int = activation_string_to_int(activation)
-    print(q.shape, k.shape, v.shape)
+    # print(q.shape, k.shape, v.shape)
     # print("activation_enum_int", activation, activation_enum_int)
     # print(query_offset)
     # print(key_offset)
