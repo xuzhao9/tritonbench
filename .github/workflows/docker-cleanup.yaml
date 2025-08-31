@@ -15,16 +15,16 @@ jobs:
     steps:
       - uses: actions/delete-package-versions@v4
         with:
-          owner: meta-pytorch
           package-name: tritonbench
-          package-type: docker
+          package-type: container
           delete-only-untagged-versions: true
+          token: ${{ secrets.TRITONBENCH_ACCESS_TOKEN }}
       - uses: actions/delete-package-versions@v4
         with:
-          owner: meta-pytorch
           package-name: tritonbench
-          package-type: docker
+          package-type: container
           min-versions-to-keep: 200
+          token: ${{ secrets.TRITONBENCH_ACCESS_TOKEN }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
