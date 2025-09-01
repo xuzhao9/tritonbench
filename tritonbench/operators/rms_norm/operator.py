@@ -29,6 +29,22 @@ except ModuleNotFoundError:
     QuackRMSNorm = None
 
 
+def parse_op_args(args: List[str]):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--M",
+        type=int,
+        default=2048,
+        help="[Optional] Size of dimension 0 in input shape (integer), default: 2048",
+    )
+    parser.add_argument(
+        "--H",
+        type=int,
+        help="[Optional] Hidden size dimension (integer)",
+    )
+    return parser.parse_args(args)
+
+
 # Reference: https://github.com/linkedin/Liger-Kernel/
 # blob/main/benchmark/scripts/benchmark_rms_norm.py
 
@@ -55,14 +71,22 @@ class Operator(BenchmarkOperator):
         self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
     ):
         super().__init__(tb_args, extra_args)
-        self.M = 2048
+        args = parse_op_args(self.extra_args)
+        self.M = args.M
+        self.H = args.H
         self.eps = 1e-6
         # they are generated later
         self.llama_rms_op = None
         self.liger_rms_op = None
 
     def get_input_iter(self) -> Generator:
-        for H in [2**i for i in range(10, 16)]:
+        # If H is provided, use only that value; otherwise use the default range
+        if self.H is not None:
+            H_values = [self.H]
+        else:
+            H_values = [2**i for i in range(10, 16)]
+
+        for H in H_values:
             x_shape = (self.M, H)
             _input = torch.randn(x_shape, dtype=self.dtype, device=self.device)
             yield H, _input
@@ -88,7 +112,7 @@ class Operator(BenchmarkOperator):
             self.llama_rms_op = LlamaRMSNorm(hidden_size=H, eps=self.eps).to(
                 self.device
             )
-        compiled = torch.compile(self.llama_rms_op)
+        compiled = torch.compile(self.llama_rms_op, mode="max-autotune-no-cudagraphs")
         return lambda: compiled(input)
 
     @register_benchmark(enabled=is_hip() and HAS_AITER)
@@ -98,7 +122,8 @@ class Operator(BenchmarkOperator):
 
     @register_x_val(label="(M, H)")
     def get_x_val(self, example_inputs) -> Tuple[int, int]:
-        return (self.M, example_inputs[0])
+        H = example_inputs[0]
+        return (self.M, H)
 
     def get_bwd_fn(self, fwd_fn: Callable) -> Callable:
         y = fwd_fn()
