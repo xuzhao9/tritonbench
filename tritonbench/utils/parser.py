@@ -1,7 +1,8 @@
 import argparse
 
-from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS, is_fbcode
 from tritonbench.utils.constants import DEFAULT_REP, DEFAULT_WARMUP
+
+from tritonbench.utils.env_utils import AVAILABLE_PRECISIONS, is_fbcode
 
 
 def get_parser(args=None):
@@ -184,6 +185,12 @@ def get_parser(args=None):
     )
     parser.add_argument(
         "--cudagraph", action="store_true", help="Benchmark with CUDA graph."
+    )
+    parser.add_argument(
+        "--latency-measure-mode",
+        default="triton_do_bench",
+        choices=["triton_do_bench", "inductor_benchmarker"],
+        help="Method to measure latency: triton_do_bench (default) or inductor_benchmarker.",
     )
     parser.add_argument(
         "--isolate",
