@@ -831,12 +831,27 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         self._available_num_inputs = sum(1 for _ in self.get_input_iter())
         self._num_inputs = self._available_num_inputs - self._input_id
     
-    def add_benchmark(self, bm_func_name: str, bm_callable: Callable):
-        decorator_kwargs = {"operator_name":self.name,"func_name":bm_func_name,"enabled":True}
+    def add_benchmark(
+        self,
+        bm_callable: Callable,
+        operator_name: Optional[str] = None,
+        func_name: Optional[str] = None,
+        baseline: bool = False,
+        fwd_only: bool = False,
+        label: Optional[str] = None
+    ) -> None:
+        decorator_kwargs = {
+            "operator_name":operator_name or self.name,
+            "func_name":func_name,
+            "enabled":True,
+            "baseline":baseline,
+            "fwd_only":fwd_only,
+            "label":label
+            }
         decorated_func = register_benchmark(**decorator_kwargs)(bm_callable)
         bound_method = types.MethodType(decorated_func, self)
-        setattr(self, bm_func_name or bm_callable.__name__, bound_method)
-        REGISTERED_BENCHMARKS[bm_func_name] = bm_callable
+        setattr(self, func_name or bm_callable.__name__, bound_method)
+        REGISTERED_BENCHMARKS[func_name] = bm_callable
 
     def run(
         self,
