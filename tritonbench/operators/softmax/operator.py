@@ -1,4 +1,5 @@
-from typing import Generator, List
+import argparse
+from typing import Generator, List, Optional
 
 import torch
 import triton
@@ -13,6 +14,7 @@ from tritonbench.utils.triton_op import (
     BenchmarkOperatorMetrics,
     register_benchmark,
     register_metric,
+    register_x_val,
 )
 
 try:
@@ -23,8 +25,32 @@ except ImportError:
     HAS_QUACK = False
 
 
+def parse_op_args(args: List[str]):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--M",
+        type=int,
+        default=4096,
+        help="[Optional] Size of dimension 0 in input shape (integer), default: 4096",
+    )
+    parser.add_argument(
+        "--N",
+        type=int,
+        help="[Optional] Size of dimension 1 in input shape (integer)",
+    )
+    return parser.parse_args(args)
+
+
 class Operator(BenchmarkOperator):
     is_compute_bound = False
+
+    def __init__(
+        self, tb_args: argparse.Namespace, extra_args: Optional[List[str]] = None
+    ):
+        super().__init__(tb_args, extra_args)
+        args = parse_op_args(self.extra_args)
+        self.M = args.M
+        self.N = args.N
 
     @register_benchmark()
     def triton_softmax(self, x):
@@ -117,21 +143,35 @@ class Operator(BenchmarkOperator):
         inner = lambda: quack_softmax(x)
         return inner
 
+    @register_benchmark()
+    def torch_compile_softmax(self, x):
+        @torch.compile(mode="max-autotune-no-cudagraphs")
+        def _inner(x):
+            return torch.nn.functional.softmax(x, dim=1)
+
+        return lambda: _inner(x)
+
     def get_input_iter(self):
-        M = 4096
-        shapes = [(M, 128 * i) for i in range(2, 100)]
+        # If N is provided, use only that value; otherwise use the default range
+        if self.N is not None:
+            shapes = [(self.M, self.N)]
+        else:
+            shapes = [(self.M, 128 * i) for i in range(2, 100)]
+
         if is_fbcode() and self.tb_args.production_shapes:
             additional_shapes = get_production_shapes(
                 self.name, "softmax", self.tb_args.shuffle_shapes
             )
             if additional_shapes:
                 shapes.extend(additional_shapes)
+
         for M, N in shapes:
             yield (torch.randn([M, N], dtype=self.dtype, device=self.device),)
 
+    @register_x_val(label="(M, N)")
     def get_x_val(self, example_inputs):
-        shape = example_inputs[0].size()
-        return [shape[0], shape[1]]
+        M, N = example_inputs[0].shape
+        return (M, N)
 
     @register_metric()
     def gbps(self, fn, example_inputs, metrics: BenchmarkOperatorMetrics) -> float:
@@ -161,7 +201,7 @@ class Operator(BenchmarkOperator):
                 ylabel="GB/s",  # label name for the y-axis
                 plot_name="softmax-performance",  # name for the plot. Used also as a file name for saving the plot.
                 args={
-                    "M": 4096
+                    "M": self.M
                 },  # values for function arguments not in `x_names` and `y_name`
             )
         )

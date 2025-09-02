@@ -111,13 +111,22 @@ class Operator(BenchmarkOperator):
 
         self.tensor_bytes_limit = get_tensor_bytes_limit(tb_args.test_only)
 
-    @register_benchmark(baseline=True)
+    @register_benchmark()
     def torch_jagged_mean_unbind_torch_mean(
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
         return lambda: torch.cat(
             [torch.mean(t, dim=0).unsqueeze(0) for t in x.unbind()]
         )  # in 3D tensor (B, *, M), takes the mean of B 2D tensors (*, M)
+
+    @register_benchmark()
+    def torch_compile_jagged_mean_unbind_torch_mean(
+        self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
+    ):
+        return torch.compile(
+            self.torch_jagged_mean_unbind_torch_mean(x, B, M, seqlen, sparsity),
+            mode="max-autotune-no-cudagraphs",
+        )
 
     @register_benchmark()
     def torch_jagged_mean_torch_nanmean(
@@ -138,6 +147,15 @@ class Operator(BenchmarkOperator):
         )
 
     @register_benchmark()
+    def torch_compile_jagged_mean_torch_nanmean(
+        self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
+    ):
+        return torch.compile(
+            self.torch_jagged_mean_torch_nanmean(x, B, M, seqlen, sparsity),
+            mode="max-autotune-no-cudagraphs",
+        )
+
+    @register_benchmark(baseline=True)
     def torch_jagged_mean_torch_sum(
         self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
     ):
@@ -153,6 +171,15 @@ class Operator(BenchmarkOperator):
                 dim=1,
             )
             / x.offsets().diff().unsqueeze(1)
+        )
+
+    @register_benchmark()
+    def torch_compile_jagged_mean_torch_sum(
+        self, x: torch.Tensor, B: int, M: int, seqlen: int, sparsity: float
+    ):
+        return torch.compile(
+            self.torch_jagged_mean_torch_sum(x, B, M, seqlen, sparsity),
+            mode="max-autotune-no-cudagraphs",
         )
 
     @register_benchmark()
@@ -182,7 +209,7 @@ class Operator(BenchmarkOperator):
                 x, dim=x._ragged_idx, keepdim=True
             )  # pyre-ignore: Undefined attribute [16]: `torch._tensor.Tensor` has no attribute `_ragged_idx`.
 
-        torch_compile_func = torch.compile(_inner)
+        torch_compile_func = torch.compile(_inner, mode="max-autotune-no-cudagraphs")
         return lambda: torch_compile_func(x)
 
     def get_x_val(self, example_inputs):
