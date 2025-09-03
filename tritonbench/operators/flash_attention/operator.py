@@ -57,22 +57,18 @@ from tritonbench.kernels.triton_fused_attention import (
 )
 
 from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda, is_hip
-
+from tritonbench.utils.python_utils import try_import
 from tritonbench.utils.path_utils import add_ld_library_path
 from tritonbench.utils.triton_op import is_fbcode
 
 
 # [Optional] flash_attn v2
-try:
+with try_import("HAS_FLASH_V2"):
     from flash_attn.flash_attn_interface import (
         flash_attn_qkvpacked_func as flash_attn_func,
     )
 
     from .test_fmha_utils import make_packed_qkv
-
-    HAS_FLASH_V2 = True
-except (ImportError, IOError, AttributeError):
-    HAS_FLASH_V2 = False
 
 HAS_CUDA_124 = (
     torch.cuda.is_available() and torch.version.cuda and torch.version.cuda >= "12.4"
@@ -83,58 +79,34 @@ IS_B200 = is_cuda() and get_nvidia_gpu_model() == "NVIDIA B200"
 # only enabling the variants known to be working on B200 (trunk).
 if not IS_B200:
     # [Optional] flash_attn v3
-    try:
-        torch_lib_path = os.path.join(os.path.dirname(__file__), "lib")
-        with add_ld_library_path(torch_lib_path):
-            from flash_attn_interface import flash_attn_func as flash_attn_v3
-        HAS_FLASH_V3 = True
-    except (ImportError, IOError, AttributeError):
+    with try_import("HAS_FLASH_V3"):
         try:
+            torch_lib_path = os.path.join(os.path.dirname(__file__), "lib")
+            with add_ld_library_path(torch_lib_path):
+                from flash_attn_interface import flash_attn_func as flash_attn_v3
+        except (ImportError, IOError, AttributeError):
             from fa3.hopper.flash_attn_interface import flash_attn_func as flash_attn_v3
 
-            HAS_FLASH_V3 = True
-        except (ImportError, IOError, AttributeError):
-            HAS_FLASH_V3 = False
-
-    try:
+    with try_import("HAS_TILELANG"):
         import tilelang
-
         from .tilelang_mha import tilelang_mha
 
-        HAS_TILELANG = True
-    except (ImportError, IOError, AttributeError, TypeError):
-        HAS_TILELANG = False
-
     # [Optional] ThunderKittens backend
-    try:
+    with try_import("HAS_TK"):
         from .tk import tk_attn
 
-        HAS_TK = True
-    except (ImportError, IOError, AttributeError):
-        HAS_TK = False
-
     # [Optional] JAX Pallas backend
-    try:
+    with try_import("HAS_PALLAS")
         import jax
-
         from tritonbench.utils.jax_utils import torch_to_jax_tensor
-
         from .pallas import mha as pallas_mha
 
-        HAS_PALLAS = True
-    except (ImportError, IOError, AttributeError):
-        HAS_PALLAS = False
-
 # [Optional] xformers backend
-try:
+with try_import("HAS_XFORMERS"):
     import xformers  # @manual=//fair/xformers:xformers
     import xformers.ops.fmha as xformers_fmha  # @manual=//fair/xformers:xformers
 
     from .test_fmha_utils import permute_qkv
-
-    HAS_XFORMERS = True
-except (ImportError, IOError, AttributeError, TypeError):
-    HAS_XFORMERS = False
 
 from typing import Any, Generator, List
 
