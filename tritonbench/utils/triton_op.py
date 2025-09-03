@@ -744,6 +744,13 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             if tb_args.metrics
             else self.DEFAULT_METRICS
         )
+        # Add deprecation warning for cuda_time metric
+        if "cuda_time" in self.required_metrics:
+            print(
+                "\033[93mWARNING: The 'cuda_time' metric is deprecated and will be removed in a future release. "
+                "Please use '--metrics=latency --latency-measure-mode=profiler' instead, which provides the same "
+                "functionality with L2 cache handling and kernel time measurement.\033[0m"
+            )
         if "compile_time" in self.required_metrics and is_fbcode():
             self.required_metrics.append("compile_time_by_stage")
         self.extra_args = extra_args
