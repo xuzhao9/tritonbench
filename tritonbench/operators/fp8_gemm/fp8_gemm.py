@@ -6,6 +6,7 @@ from typing import Any, Callable, List, Optional
 import torch
 import torch._inductor.config as inductor_config
 import triton
+from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -15,7 +16,13 @@ from tritonbench.utils.triton_op import (
     register_metric,
 )
 
+from tritonbench.operators.fp8_gemm.persistent import blackwell_persistent_tma
+
 from .tutorial import matmul as tutorial_matmul
+
+IS_B200 = is_cuda() and get_nvidia_gpu_model() == "NVIDIA B200"
+
+torch._dynamo.config.recompile_limit = 10000
 
 logger = logging.getLogger(__name__)
 try:
@@ -166,6 +173,12 @@ class Operator(BenchmarkOperator):
             compiled(a, b)
 
         return lambda: compiled(a, b)
+
+    if IS_B200:
+
+        @register_benchmark(enabled=True)
+        def blackwell_persistent_tma_fp8_gemm(self, a, b, scale_a, scale_b):
+            return lambda: blackwell_persistent_tma(a, b.T, scale_a, scale_b.T, self._get_dtype())
 
     @register_benchmark()
     def triton_fp8_gemm(self, a, b, scale_a, scale_b):
