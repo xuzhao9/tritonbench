@@ -57,8 +57,8 @@ from tritonbench.kernels.triton_fused_attention import (
 )
 
 from tritonbench.utils.env_utils import get_nvidia_gpu_model, is_cuda, is_hip
-from tritonbench.utils.python_utils import try_import
 from tritonbench.utils.path_utils import add_ld_library_path
+from tritonbench.utils.python_utils import try_import
 from tritonbench.utils.triton_op import is_fbcode
 
 
@@ -89,6 +89,7 @@ if not IS_B200:
 
     with try_import("HAS_TILELANG"):
         import tilelang
+
         from .tilelang_mha import tilelang_mha
 
     # [Optional] ThunderKittens backend
@@ -96,9 +97,10 @@ if not IS_B200:
         from .tk import tk_attn
 
     # [Optional] JAX Pallas backend
-    with try_import("HAS_PALLAS")
+    with try_import("HAS_PALLAS"):
         import jax
         from tritonbench.utils.jax_utils import torch_to_jax_tensor
+
         from .pallas import mha as pallas_mha
 
 # [Optional] xformers backend
