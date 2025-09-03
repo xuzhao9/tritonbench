@@ -9,6 +9,9 @@ from torch._inductor.runtime.benchmarking import benchmarker
 
 NS_TO_MS = 1e-6
 
+# Kernel name for L2 cache clearing - we want to exclude this from latency measurements
+CACHE_CLEAR_KERNEL = "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native::FillFunctor<int>, std::array<char*, 1ul>)"
+
 
 class Latency:
     times: List[float]
@@ -183,6 +186,9 @@ def _do_bench_profiler(fn, warmup, rep, return_mode="all", grad_to_none=None):
     Returns:
         List of measured kernel times in milliseconds (if return_mode="all") or single value.
     """
+    # Get cache for L2 cache clearing
+    cache = triton.runtime.driver.active.get_empty_cache_for_benchmark()
+
     # First, estimate the runtime to calculate iterations
     estimate_ms = benchmarker.benchmark_gpu(fn, estimation_iters=5, benchmark_iters=10)
 
@@ -201,6 +207,7 @@ def _do_bench_profiler(fn, warmup, rep, return_mode="all", grad_to_none=None):
         if grad_to_none is not None:
             for x in grad_to_none:
                 x.grad = None
+        cache.zero_()
         fn()
     torch.cuda.synchronize()
 
@@ -222,6 +229,7 @@ def _do_bench_profiler(fn, warmup, rep, return_mode="all", grad_to_none=None):
             profile_memory=False,
             with_stack=False,
         ) as prof:
+            cache.zero_()
             fn()
             torch.cuda.synchronize()
 
@@ -233,9 +241,11 @@ def _do_bench_profiler(fn, warmup, rep, return_mode="all", grad_to_none=None):
 
         # Get raw function events and collect time intervals
         for evt in prof.events():
-            # Check for CUDA kernel events
-            if evt.device_type == torch.autograd.DeviceType.CUDA and hasattr(
-                evt, "time_range"
+            # Check for CUDA kernel events, excluding cache clear kernel
+            if (
+                evt.device_type == torch.autograd.DeviceType.CUDA
+                and hasattr(evt, "time_range")
+                and evt.name != CACHE_CLEAR_KERNEL
             ):
                 # time_range has start and end attributes in microseconds
                 start_us = evt.time_range.start
