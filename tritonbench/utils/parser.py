@@ -182,8 +182,8 @@ def get_parser(args=None):
     parser.add_argument(
         "--latency-measure-mode",
         default="triton_do_bench",
-        choices=["triton_do_bench", "inductor_benchmarker"],
-        help="Method to measure latency: triton_do_bench (default) or inductor_benchmarker.",
+        choices=["triton_do_bench", "inductor_benchmarker", "profiler"],
+        help="Method to measure latency: triton_do_bench (default), inductor_benchmarker, profiler.",
     )
     parser.add_argument(
         "--isolate",
