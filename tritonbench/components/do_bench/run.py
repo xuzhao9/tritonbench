@@ -8,6 +8,8 @@ import triton
 from torch._inductor.runtime.benchmarking import benchmarker
 
 NS_TO_MS = 1e-6
+
+# Kernel name for L2 cache clearing - we want to exclude this from latency measurements
 CACHE_CLEAR_KERNEL = "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native::FillFunctor<int>, std::array<char*, 1ul>)"
 
 
