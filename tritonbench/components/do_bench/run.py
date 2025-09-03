@@ -129,16 +129,17 @@ def _summarize_statistics(times, quantiles, return_mode):
     return getattr(torch, return_mode)(times).item()
 
 
-def _do_bench_inductor(fn, warmup, rep, grad_to_none=None):
+def _do_bench_inductor(fn, warmup, rep, return_mode="all", grad_to_none=None):
     """Measure latency using inductor benchmarker.
 
     Args:
         warmup: Target warmup time in milliseconds (matches triton.testing.do_bench)
         rep: Target total measurement time in milliseconds (matches triton.testing.do_bench)
+        return_mode: "all" for list of measurements, other modes for single values
         grad_to_none: Tensors whose gradients should be cleared before each measurement
 
     Returns:
-        List of measured times in milliseconds.
+        List of measured times in milliseconds (if return_mode="all") or single value.
     """
     # First, estimate the runtime with a single measurement
     estimate_ms = benchmarker.benchmark_gpu(fn, estimation_iters=5, benchmark_iters=10)
@@ -161,7 +162,8 @@ def _do_bench_inductor(fn, warmup, rep, grad_to_none=None):
         ms_time = benchmarker.benchmark_gpu(fn)
         times_ms.append(ms_time)
 
-    return times_ms
+    times = torch.tensor(times_ms, dtype=torch.float)
+    return _summarize_statistics(times, quantiles=None, return_mode=return_mode)
 
 
 def _do_bench_profiler(fn, warmup, rep, return_mode="all", grad_to_none=None):
