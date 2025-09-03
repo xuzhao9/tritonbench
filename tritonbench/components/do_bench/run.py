@@ -161,6 +161,117 @@ def _do_bench_inductor(fn, warmup, rep, grad_to_none=None):
     return times_ms
 
 
+def _do_bench_profiler(fn, warmup, rep, return_mode="all", grad_to_none=None):
+    """Measure GPU kernel execution time using PyTorch profiler.
+
+    This method profiles the function and extracts the actual GPU kernel execution
+    time by summing up all CUDA kernel durations (excluding overlaps) from the profiler trace.
+
+    Args:
+        fn: Function to benchmark
+        warmup: Target warmup time in milliseconds (matches triton.testing.do_bench)
+        rep: Target total measurement time in milliseconds (matches triton.testing.do_bench)
+        return_mode: "all" for list of measurements, other modes for single values
+        grad_to_none: Tensors whose gradients should be cleared before each measurement
+
+    Returns:
+        List of measured kernel times in milliseconds (if return_mode="all") or single value.
+    """
+    # First, estimate the runtime to calculate iterations
+    estimate_ms = benchmarker.benchmark_gpu(fn, estimation_iters=5, benchmark_iters=10)
+
+    # Calculate number of iterations based on target rep time
+    if estimate_ms == 0:
+        n_repeat = 100  # Default if function is very fast
+    else:
+        n_repeat = max(1, int(rep / estimate_ms))
+
+    # Calculate warmup iterations
+    n_warmup = max(1, int(warmup / estimate_ms)) if estimate_ms > 0 else 25
+
+    # Warmup phase
+    torch.cuda.synchronize()
+    for _ in range(n_warmup):
+        if grad_to_none is not None:
+            for x in grad_to_none:
+                x.grad = None
+        fn()
+    torch.cuda.synchronize()
+
+    # Benchmark phase - collect kernel times for each iteration
+    all_kernel_times = []
+
+    for _ in range(n_repeat):
+        # Clear gradients if needed
+        if grad_to_none is not None:
+            for x in grad_to_none:
+                x.grad = None
+
+        # Profile single execution
+        with torch.profiler.profile(
+            activities=[
+                torch.autograd.ProfilerActivity.CUDA,
+            ],
+            record_shapes=False,
+            profile_memory=False,
+            with_stack=False,
+        ) as prof:
+            fn()
+            torch.cuda.synchronize()
+
+        # Extract kernel timings from profiler trace
+        total_kernel_time_us = 0.0
+
+        # Collect all kernel execution intervals
+        kernel_intervals = []
+
+        # Get raw function events and collect time intervals
+        for evt in prof.events():
+            # Check for CUDA kernel events
+            if evt.device_type == torch.autograd.DeviceType.CUDA and hasattr(
+                evt, "time_range"
+            ):
+                # time_range has start and end attributes in microseconds
+                start_us = evt.time_range.start
+                end_us = evt.time_range.end
+                if start_us < end_us:  # Valid interval
+                    kernel_intervals.append((start_us, end_us))
+
+        # Merge overlapping intervals to get actual GPU busy time
+        # This algorithm handles concurrent kernels across multiple streams by:
+        # 1. Sorting all kernel intervals by start time
+        # 2. Merging overlapping intervals to avoid double-counting concurrent execution
+        # 3. Summing only the time when at least one kernel is running
+        # This gives us the true GPU wall-clock time, excluding idle gaps between kernels
+        if kernel_intervals:
+            # Sort intervals by start time
+            kernel_intervals.sort(key=lambda x: x[0])
+
+            # Merge overlapping intervals using a sweep-line algorithm
+            # Example: [(0,5), (3,8), (10,15)] -> [(0,8), (10,15)]
+            merged_intervals = [kernel_intervals[0]]
+            for start, end in kernel_intervals[1:]:
+                last_start, last_end = merged_intervals[-1]
+
+                if start <= last_end:
+                    # Overlapping or adjacent intervals, merge them
+                    # Take the max of end times to handle nested intervals
+                    merged_intervals[-1] = (last_start, max(last_end, end))
+                else:
+                    # Non-overlapping interval, add as new
+                    merged_intervals.append((start, end))
+
+            # Calculate total GPU busy time by summing merged intervals
+            total_kernel_time_us = sum(end - start for start, end in merged_intervals)
+
+        # Convert microseconds to milliseconds
+        total_kernel_time_ms = total_kernel_time_us / 1000.0
+        all_kernel_times.append(total_kernel_time_ms)
+
+    times = torch.tensor(all_kernel_times, dtype=torch.float)
+    return _summarize_statistics(times, quantiles=None, return_mode=return_mode)
+
+
 def _do_bench_cpu(
     fn, warmup, rep=20, grad_to_none=None, quantiles=None, return_mode="mean"
 ):
@@ -215,7 +326,7 @@ def do_bench_wrapper(
     """Wrapper to triton's do_bench to gain latency.
 
     Args:
-        latency_measure_mode: Either "triton_do_bench" (default) or "inductor_benchmarker"
+        latency_measure_mode: Either "triton_do_bench" (default) or "inductor_benchmarker" or "profiler"
     """
     try:
         if device == "cpu":
@@ -239,25 +350,23 @@ def do_bench_wrapper(
                     )
                 )
         else:
-            if latency_measure_mode == "inductor_benchmarker":
-                return Latency(
-                    times=_do_bench_inductor(
-                        fn,
-                        warmup=warmup,
-                        rep=rep,
-                        grad_to_none=grad_to_none,
-                    )
+            bench_fn = (
+                _do_bench_profiler
+                if latency_measure_mode == "profiler"
+                else _do_bench_inductor
+                if latency_measure_mode == "inductor_benchmarker"
+                else triton.testing.do_bench
+            )
+
+            return Latency(
+                times=bench_fn(
+                    fn,
+                    warmup=warmup,
+                    rep=rep,
+                    return_mode="all",
+                    grad_to_none=grad_to_none,
                 )
-            else:  # default to triton do_bench
-                return Latency(
-                    times=triton.testing.do_bench(
-                        fn,
-                        warmup=warmup,
-                        rep=rep,
-                        return_mode="all",
-                        grad_to_none=grad_to_none,
-                    )
-                )
+            )
     except Exception as e:
         if not bypass_fail:
             raise e
