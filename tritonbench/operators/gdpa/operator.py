@@ -13,6 +13,15 @@ buck2 run @mode/opt //pytorch/tritonbench:run -- \
     --only gdpa,gdpa_opt,gdpa_opt_sorted \
     --mode fwd_bwd \
     --sparsity 0.7
+
+# Small inputs for quick testing
+python run.py \
+    --op gdpa \
+    --metrics speedup,accuracy \
+    --batch 1 \
+    --max_seq_len 4 \
+    --dim 16 \
+    --head 1
 ```
 """
 
@@ -21,7 +30,6 @@ import gc
 from typing import Any, Callable, Generator, List, Optional
 
 import torch
-from tritonbench.operators.gdpa.gdpa_blackwell_tlx import gdpa_forward_tlx
 
 from tritonbench.utils.triton_op import (
     BenchmarkOperator,
@@ -31,6 +39,10 @@ from tritonbench.utils.triton_op import (
     register_metric,
     register_x_val,
 )
+from tritonbench.utils.triton_utils import has_tlx
+
+if has_tlx():
+    from tritonbench.operators.gdpa.gdpa_blackwell_tlx import gdpa_forward_tlx
 
 from .gdpa import gdpa
 from .gdpa_utils import generate_jagged_data
@@ -161,7 +173,7 @@ class Operator(BenchmarkOperator):
         self.head = args.head
         self.kv_len = args.kv_len
 
-    @register_benchmark(enabled=False)
+    @register_benchmark(enabled=has_tlx())
     def tlx_gdpa_fwd(
         self,
         _config_name,
@@ -195,7 +207,7 @@ class Operator(BenchmarkOperator):
 
         return _inner
 
-    @register_benchmark(baseline=True)
+    @register_benchmark()
     def gdpa(
         self,
         _config_name,
@@ -224,6 +236,124 @@ class Operator(BenchmarkOperator):
             return real_output
 
         return _inner
+
+    @register_benchmark(baseline=True)
+    def eager_gdpa(
+        self,
+        _config_name,
+        jagged_q,
+        jagged_k,
+        jagged_v,
+        jagged_data,
+        padded_data,
+        activation,
+    ):
+        def _inner():
+            B = len(jagged_data["q_offsets"]) - 1
+            outputs = []
+            q_offsets = jagged_data["q_offsets"]
+            k_offsets = jagged_data["k_offsets"]
+
+            for i in range(B):
+                # Extract sequence i without .item() to avoid graph breaks
+                q_start = q_offsets[i]
+                q_end = q_offsets[i + 1]
+                k_start = k_offsets[i]
+                k_end = k_offsets[i + 1]
+
+                # Get Q, K, V for this sequence using tensor indices
+                q_seq = jagged_q[q_start:q_end]  # [seq_len_q, H, D]
+                k_seq = jagged_k[k_start:k_end] if jagged_k is not None else None
+                v_seq = jagged_v[k_start:k_end] if jagged_v is not None else None
+
+                # Handle fused KV case
+                if v_seq is None and k_seq is not None:
+                    # Fused KV case
+                    kv = k_seq
+                    H = q_seq.shape[-2] if q_seq.dim() == 3 else 1
+                    D = q_seq.shape[-1]
+                    k_seq = kv[..., :D]
+                    v_seq = kv[..., D:]
+
+                # For attention, we need [batch, heads, seq, dim] format
+                # Input is [seq, heads, dim], so reshape to [1, heads, seq, dim]
+                if q_seq.dim() == 3:
+                    q_seq = q_seq.transpose(0, 1).unsqueeze(0)  # [1, H, seq_q, D]
+                    k_seq = k_seq.transpose(0, 1).unsqueeze(0)  # [1, H, seq_k, D]
+                    v_seq = v_seq.transpose(0, 1).unsqueeze(0)  # [1, H, seq_k, D]
+                else:
+                    # 2D case: [seq, dim] -> [1, 1, seq, dim]
+                    q_seq = q_seq.unsqueeze(0).unsqueeze(0)
+                    k_seq = k_seq.unsqueeze(0).unsqueeze(0)
+                    v_seq = v_seq.unsqueeze(0).unsqueeze(0)
+
+                # Create attention mask for window size if needed
+                attn_mask = None
+                window_size = jagged_data.get("window_size", None)
+                if window_size is not None and window_size > 0:
+                    seq_len_q = q_seq.shape[2]
+                    seq_len_k = k_seq.shape[2]
+                    row_indices = torch.arange(seq_len_q, device=q_seq.device).view(
+                        -1, 1
+                    )
+                    col_indices = torch.arange(seq_len_k, device=q_seq.device).view(
+                        1, -1
+                    )
+                    window_mask = torch.abs(row_indices - col_indices) > window_size
+                    attn_mask = torch.zeros(
+                        seq_len_q, seq_len_k, device=q_seq.device, dtype=q_seq.dtype
+                    )
+                    attn_mask.masked_fill_(window_mask, float("-inf"))
+
+                scale = 1.0
+                scores = torch.matmul(q_seq, k_seq.transpose(-2, -1)) * scale
+
+                if attn_mask is not None:
+                    scores = scores + attn_mask
+
+                if activation == "gelu":
+                    scores = torch.nn.functional.gelu(scores)
+                elif activation == "fast_gelu":
+                    scores = torch.nn.functional.gelu(scores, approximate="tanh")
+                elif activation == "tanh":
+                    scores = torch.tanh(scores)
+
+                output = torch.matmul(scores, v_seq)
+
+                # Reshape back: [1, H, seq_q, D] -> [seq_q, H, D]
+                output = output.squeeze(0).transpose(0, 1)
+                outputs.append(output)
+
+            # Concatenate all outputs
+            real_output = torch.cat(outputs, dim=0)
+
+            return real_output
+
+        return _inner
+
+    @register_benchmark()
+    def torch_compile_gdpa(
+        self,
+        _config_name,
+        jagged_q,
+        jagged_k,
+        jagged_v,
+        jagged_data,
+        padded_data,
+        activation,
+    ):
+        return torch.compile(
+            self.eager_gdpa(
+                _config_name,
+                jagged_q,
+                jagged_k,
+                jagged_v,
+                jagged_data,
+                padded_data,
+                activation,
+            ),
+            mode="max-autotune-no-cudagraphs",
+        )
 
     @register_benchmark(enabled=True)
     def gdpa_opt(
@@ -346,7 +476,9 @@ class Operator(BenchmarkOperator):
             #     **jagged_data
             # )  # fail when seq length is long
             head_dim = int(D / H)
-            padded_q = torch.randn(B, H, dense_q_len, head_dim)
+            # Handle case where dense_q_len might be None
+            q_len = dense_q_len if dense_q_len is not None else max_M
+            padded_q = torch.randn(B, H, q_len, head_dim)
             padded_k = torch.randn(B, H, max_M, head_dim)
             padded_v = torch.randn(B, H, max_M, head_dim)
             padded_data = {
