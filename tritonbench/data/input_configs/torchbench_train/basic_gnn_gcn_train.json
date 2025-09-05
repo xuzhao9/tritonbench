@@ -1,74 +1,142 @@
 {
-    "aten.add.Tensor": {
-        "count": 3,
-        "inputs": "((T([10000, 64], f32), T([64], f32)), {})"
-    },
-    "aten.cat.default": {
-        "count": 3,
-        "inputs": "(([T([2, 199981], i64), T([2, 10000], i64)], 1), {})"
-    },
-    "aten.eq.Scalar": {
-        "count": 3,
-        "inputs": "((T([10000], f32), inf), {})"
-    },
-    "aten.gather.default": {
-        "count": 3,
-        "inputs": "((T([10000, 64], f32), 0, T([209981, 64], i64, stride=(1, 0))), {})"
-    },
-    "aten.index.Tensor": {
-        "count": 6,
-        "inputs": "((T([10000], f32), [T([209981], i64)]), {})"
-    },
-    "aten.index_add.default": {
-        "count": 3,
-        "inputs": "((T([10000, 64], f32), -2, T([209981], i64), T([209981, 64], f32)), {})"
-    },
-    "aten.index_select.default": {
-        "count": 3,
-        "inputs": "((T([10000, 64], f32), -2, T([209981], i64)), {})"
-    },
-    "aten.masked_fill_.Scalar": {
-        "count": 3,
-        "inputs": "((T([10000], f32), T([10000], b8), 0), {})"
-    },
-    "aten.mm.default": {
-        "count": 2,
-        "inputs": "((T([10000, 64], f32), T([64, 64], f32)), {})"
-    },
-    "aten.mul.Tensor": {
-        "count": 3,
-        "inputs": "((T([209981, 64], f32), T([209981, 1], f32)), {})"
-    },
-    "aten.ne.Tensor": {
-        "count": 3,
-        "inputs": "((T([200000], i64), T([200000], i64)), {})"
-    },
-    "aten.new_zeros.default": {
-        "count": 3,
-        "inputs": "((T([209981, 64], f32), [10000, 64]), {'dtype': f32, 'layout': torch.strided, 'device': 'cuda'})"
-    },
-    "aten.pow_.Scalar": {
-        "count": 3,
-        "inputs": "((T([10000], f32), -0.5), {})"
-    },
-    "aten.relu.default": {
-        "count": 2,
-        "inputs": "((T([10000, 64], f32),), {})"
-    },
-    "aten.repeat.default": {
-        "count": 3,
-        "inputs": "((T([1, 10000], i64), [2, 1]), {})"
-    },
-    "aten.scatter_add_.default": {
-        "count": 3,
-        "inputs": "((T([10000, 64], f32), 0, T([209981, 64], i64, stride=(1, 0)), T([209981, 64], f32)), {})"
-    },
-    "aten.sum.dim_IntList": {
-        "count": 3,
-        "inputs": "((T([10000, 64], f32), [0], True), {})"
-    },
-    "aten.threshold_backward.default": {
-        "count": 2,
-        "inputs": "((T([10000, 64], f32), T([10000, 64], f32), 0), {})"
-    }
+    "aten.add.Tensor": [
+        {
+            "count": 3,
+            "inputs": "((T([10000, 64], f32), T([64], f32)), {})"
+        }
+    ],
+    "aten.cat.default": [
+        {
+            "count": 3,
+            "inputs": "(([T([2, 199981], i64), T([2, 10000], i64)], 1), {})"
+        }
+    ],
+    "aten.eq.Scalar": [
+        {
+            "count": 3,
+            "inputs": "((T([10000], f32), inf), {})"
+        }
+    ],
+    "aten.gather.default": [
+        {
+            "count": 3,
+            "inputs": "((T([10000, 64], f32), 0, T([209981, 64], i64, stride=(1, 0))), {})"
+        }
+    ],
+    "aten.index.Tensor": [
+        {
+            "count": 3,
+            "inputs": "((T([2, 200000], i64), [None, T([200000], b8)]), {})"
+        },
+        {
+            "count": 6,
+            "inputs": "((T([10000], f32), [T([209981], i64)]), {})"
+        }
+    ],
+    "aten.index_add.default": [
+        {
+            "count": 3,
+            "inputs": "((T([10000, 64], f32), -2, T([209981], i64), T([209981, 64], f32)), {})"
+        }
+    ],
+    "aten.index_select.default": [
+        {
+            "count": 3,
+            "inputs": "((T([10000, 64], f32), -2, T([209981], i64)), {})"
+        }
+    ],
+    "aten.masked_fill_.Scalar": [
+        {
+            "count": 3,
+            "inputs": "((T([10000], f32), T([10000], b8), 0), {})"
+        }
+    ],
+    "aten.mm.default": [
+        {
+            "count": 3,
+            "inputs": "((T([10000, 64], f32), T([64, 64], f32, stride=(1, 64))), {})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([64, 10000], f32, stride=(1, 64)), T([10000, 64], f32)), {})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([10000, 64], f32), T([64, 64], f32)), {})"
+        }
+    ],
+    "aten.mul.Tensor": [
+        {
+            "count": 6,
+            "inputs": "((T([209981], f32), T([209981], f32)), {})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([209981, 1], f32), T([209981, 64], f32)), {})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([209981, 64], f32), T([209981, 1], f32)), {})"
+        }
+    ],
+    "aten.ne.Tensor": [
+        {
+            "count": 3,
+            "inputs": "((T([200000], i64), T([200000], i64)), {})"
+        }
+    ],
+    "aten.new_zeros.default": [
+        {
+            "count": 3,
+            "inputs": "((T([209981], f32), [10000]), {'pin_memory': False})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([209981, 64], f32), [10000, 64]), {'pin_memory': False})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([209981, 64], f32), [10000, 64]), {'dtype': f32, 'layout': torch.strided, 'device': 'cuda'})"
+        }
+    ],
+    "aten.pow_.Scalar": [
+        {
+            "count": 3,
+            "inputs": "((T([10000], f32), -0.5), {})"
+        }
+    ],
+    "aten.relu.default": [
+        {
+            "count": 2,
+            "inputs": "((T([10000, 64], f32),), {})"
+        }
+    ],
+    "aten.repeat.default": [
+        {
+            "count": 3,
+            "inputs": "((T([1, 10000], i64), [2, 1]), {})"
+        }
+    ],
+    "aten.scatter_add_.default": [
+        {
+            "count": 3,
+            "inputs": "((T([10000], f32), 0, T([209981], i64), T([209981], f32)), {})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([10000, 64], f32), 0, T([209981, 64], i64, stride=(1, 0)), T([209981, 64], f32)), {})"
+        }
+    ],
+    "aten.sum.dim_IntList": [
+        {
+            "count": 3,
+            "inputs": "((T([10000, 64], f32), [0], True), {})"
+        }
+    ],
+    "aten.threshold_backward.default": [
+        {
+            "count": 2,
+            "inputs": "((T([10000, 64], f32), T([10000, 64], f32), 0), {})"
+        }
+    ]
 }
