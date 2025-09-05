@@ -1,0 +1,86 @@
+{
+    "aten._foreach_sqrt.default": {
+        "count": 1,
+        "inputs": "(([T([16, 1], f32), T([16], f32), T([16, 16], f32), T([16], f32), T([16, 16], f32), T([16], f32), T([16, 16], f32), T([16], f32), T([1, 16], f32), T([1], f32)],), {})"
+    },
+    "aten._unsafe_view.default": {
+        "count": 1,
+        "inputs": "((T([1000, 1, 1], f32), [1000, 1, 1, 1]), {})"
+    },
+    "aten.add.Tensor": {
+        "count": 1,
+        "inputs": "((T([16, 1], f32), T([16, 1], f32)), {})"
+    },
+    "aten.addmm.default": {
+        "count": 1,
+        "inputs": "((T([1], f32), T([1000, 16], f32), T([16, 1], f32)), {})"
+    },
+    "aten.cat.default": {
+        "count": 1,
+        "inputs": "(([T([1000, 1, 1], f32)], 1), {})"
+    },
+    "aten.cumsum.default": {
+        "count": 1,
+        "inputs": "((T([1], i64), 0), {})"
+    },
+    "aten.div.Tensor": {
+        "count": 2,
+        "inputs": "((T([], f32), 3), {})"
+    },
+    "aten.fill_.Scalar": {
+        "count": 1,
+        "inputs": "((T([1000, 1], f32), 1), {})"
+    },
+    "aten.linalg_vector_norm.default": {
+        "count": 1,
+        "inputs": "((T([1000, 3], f32), 2.0, [1]), {})"
+    },
+    "aten.mm.default": {
+        "count": 2,
+        "inputs": "((T([1, 1000], f32), T([1000, 16], f32)), {})"
+    },
+    "aten.mse_loss.default": {
+        "count": 1,
+        "inputs": "((T([1000, 3], f32), T([1000, 3], f32)), {})"
+    },
+    "aten.mse_loss_backward.default": {
+        "count": 1,
+        "inputs": "((T([], f32), T([1000, 1], f32), T([1000, 1], f32), 1), {})"
+    },
+    "aten.mul.Scalar": {
+        "count": 4,
+        "inputs": "((T([1000, 1, 16], f32), -2), {})"
+    },
+    "aten.mul.Tensor": {
+        "count": 8,
+        "inputs": "((T([1000, 1, 16], f32), T([1000, 1, 16], f32)), {})"
+    },
+    "aten.neg.default": {
+        "count": 2,
+        "inputs": "((T([1000, 1], f32),), {})"
+    },
+    "aten.new_zeros.default": {
+        "count": 1,
+        "inputs": "((T([1000, 1], f32), [1000, 1, 1]), {'pin_memory': False})"
+    },
+    "aten.split_with_sizes.default": {
+        "count": 1,
+        "inputs": "((T([1000, 1, 1], f32), [1], 1), {})"
+    },
+    "aten.squeeze_.dims": {
+        "count": 1,
+        "inputs": "((T([1000, 1, 1], f32), [1]), {})"
+    },
+    "aten.sum.dim_IntList": {
+        "count": 8,
+        "inputs": "((T([1000, 16], f32), [0], True), {})"
+    },
+    "aten.tanh.default": {
+        "count": 8,
+        "inputs": "((T([1000, 16], f32),), {})"
+    },
+    "aten.tanh_backward.default": {
+        "count": 8,
+        "inputs": "((T([1000, 16], f32), T([1000, 16], f32)), {})"
+    }
+}

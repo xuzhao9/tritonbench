@@ -1,0 +1,118 @@
+{
+    "aten._foreach_sqrt.default": {
+        "count": 1,
+        "inputs": "(([T([64, 3, 4, 4], f32), T([64], f32), T([128, 64, 4, 4], f32), T([128], f32), T([256, 128, 4, 4], f32), T([256], f32), T([512, 256, 4, 4], f32), T([512], f32), T([1, 512, 4, 4], f32), T([1], f32), T([64, 3, 4, 4], f32), T([64], f32), T([128, 64, 4, 4], f32), T([128], f32), T([256, 128, 4, 4], f32), T([256], f32), T([512, 256, 4, 4], f32), T([512], f32), T([1, 512, 4, 4], f32), T([1], f32)],), {})"
+    },
+    "aten.abs.default": {
+        "count": 4,
+        "inputs": "((T([1, 3, 256, 256], f32),), {})"
+    },
+    "aten.add.Tensor": {
+        "count": 2,
+        "inputs": "((T([64, 3, 4, 4], f32), T([64, 3, 4, 4], f32)), {})"
+    },
+    "aten.cat.default": {
+        "count": 2,
+        "inputs": "(([T([1, 3, 256, 256], f32)],), {})"
+    },
+    "aten.convolution.default": {
+        "count": 6,
+        "inputs": "((T([1, 512, 31, 31], f32), T([1, 512, 4, 4], f32), T([1], f32), [1, 1], [1, 1], [1, 1], False, [0, 0], 1), {})"
+    },
+    "aten.convolution_backward.default": {
+        "count": 4,
+        "inputs": "((T([1, 64, 128, 128], f32), T([1, 3, 256, 256], f32), T([64, 3, 4, 4], f32), [64], [2, 2], [1, 1], [1, 1], False, [0, 0], 1, [False, True, True]), {})"
+    },
+    "aten.copy_.default": {
+        "count": 120,
+        "inputs": "((T([1, 256, 64, 64], f32), T([1, 256, 64, 64], f32)), {})"
+    },
+    "aten.div.Scalar": {
+        "count": 4,
+        "inputs": "((T([1, 3, 256, 256], f32, stride=(0, 0, 0, 0)), 196608), {})"
+    },
+    "aten.leaky_relu_.default": {
+        "count": 6,
+        "inputs": "((T([1, 512, 31, 31], f32), 0.2), {})"
+    },
+    "aten.leaky_relu_backward.default": {
+        "count": 6,
+        "inputs": "((T([1, 64, 128, 128], f32), T([1, 64, 128, 128], f32), 0.2, True), {})"
+    },
+    "aten.mean.default": {
+        "count": 4,
+        "inputs": "((T([1, 3, 256, 256], f32),), {})"
+    },
+    "aten.mse_loss.default": {
+        "count": 6,
+        "inputs": "((T([1, 1, 30, 30], f32), T([1, 1, 30, 30], f32, stride=(0, 0, 0, 0))), {})"
+    },
+    "aten.mse_loss_backward.default": {
+        "count": 6,
+        "inputs": "((T([], f32), T([1, 1, 30, 30], f32), T([1, 1, 30, 30], f32, stride=(0, 0, 0, 0)), 1), {})"
+    },
+    "aten.mul.Tensor": {
+        "count": 4,
+        "inputs": "((T([1, 3, 256, 256], f32), T([1, 3, 256, 256], f32)), {})"
+    },
+    "aten.native_batch_norm.default": {
+        "count": 6,
+        "inputs": "((T([1, 512, 31, 31], f32), None, None, None, None, True, 0.1, 1e-05), {})"
+    },
+    "aten.native_batch_norm_backward.default": {
+        "count": 114,
+        "inputs": "((T([1, 256, 64, 64], f32), T([1, 256, 64, 64], f32), None, None, None, T([256], f32), T([256], f32), True, 1e-05, [True, False, False]), {})"
+    },
+    "aten.new_empty_strided.default": {
+        "count": 60,
+        "inputs": "((T([1, 256, 64, 64], f32), [1, 256, 64, 64], [1048576, 4096, 64, 1]), {})"
+    },
+    "aten.new_zeros.default": {
+        "count": 60,
+        "inputs": "((T([256, 64, 64], f32), [1048576]), {})"
+    },
+    "aten.reflection_pad2d.default": {
+        "count": 6,
+        "inputs": "((T([1, 64, 256, 256], f32), [3, 3, 3, 3]), {})"
+    },
+    "aten.reflection_pad2d_backward.default": {
+        "count": 2,
+        "inputs": "((T([1, 3, 262, 262], f32), T([1, 3, 256, 256], f32), [3, 3, 3, 3]), {})"
+    },
+    "aten.relu_.default": {
+        "count": 60,
+        "inputs": "((T([1, 256, 64, 64], f32),), {})"
+    },
+    "aten.sgn.default": {
+        "count": 4,
+        "inputs": "((T([1, 3, 256, 256], f32),), {})"
+    },
+    "aten.split.Tensor": {
+        "count": 12,
+        "inputs": "((T([1, 3, 256, 256], f32), 1), {})"
+    },
+    "aten.split_with_sizes.default": {
+        "count": 4,
+        "inputs": "((T([1, 3, 256, 256], f32), [1]), {})"
+    },
+    "aten.sub.Tensor": {
+        "count": 4,
+        "inputs": "((T([1, 3, 256, 256], f32), T([1, 3, 256, 256], f32)), {})"
+    },
+    "aten.tanh.default": {
+        "count": 6,
+        "inputs": "((T([1, 3, 256, 256], f32),), {})"
+    },
+    "aten.tanh_backward.default": {
+        "count": 6,
+        "inputs": "((T([1, 3, 256, 256], f32), T([1, 3, 256, 256], f32)), {})"
+    },
+    "aten.threshold_backward.default": {
+        "count": 60,
+        "inputs": "((T([1, 256, 64, 64], f32), T([1, 256, 64, 64], f32), 0), {})"
+    },
+    "aten.unbind.int": {
+        "count": 2,
+        "inputs": "((T([1, 3, 256, 256], f32),), {})"
+    }
+}

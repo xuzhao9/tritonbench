@@ -1,0 +1,70 @@
+{
+    "aten._embedding_bag.default": {
+        "count": 1,
+        "inputs": "((T([1000000, 64], f32), T([204792], i64), T([2048], i64), False, 0, True, None), {})"
+    },
+    "aten._embedding_bag_backward.default": {
+        "count": 1,
+        "inputs": "((T([2048, 64], f32, stride=(576, 1)), T([204789], i64), T([2048], i64), T([204789], i64), T([2048], i64), T([0], i64), 1000000, False, 0, True, None), {})"
+    },
+    "aten._sparse_coo_tensor_with_dims_and_tensors.default": {
+        "count": 1,
+        "inputs": "((1, 1, [1000000, 64], T([1, 204789], i64), T([204789, 64], f32)), {'dtype': f32, 'layout': torch.sparse_coo, 'device': 'cuda', 'pin_memory': None})"
+    },
+    "aten.add.Tensor": {
+        "count": 1,
+        "inputs": "((T([2048, 64], f32, stride=(100, 1)), T([2048, 64], f32, stride=(576, 1))), {})"
+    },
+    "aten.add_.Tensor": {
+        "count": 1,
+        "inputs": "((T([1], f32), T([1], f32)), {'alpha': -0.01})"
+    },
+    "aten.addmm.default": {
+        "count": 1,
+        "inputs": "((T([1], f32), T([2048, 1024], f32), T([1024, 1], f32)), {})"
+    },
+    "aten.bmm.default": {
+        "count": 1,
+        "inputs": "((T([2048, 9, 9], f32), T([2048, 9, 64], f32)), {})"
+    },
+    "aten.cat.default": {
+        "count": 1,
+        "inputs": "(([T([2048, 64], f32), T([2048, 36], f32)], 1), {})"
+    },
+    "aten.index.Tensor": {
+        "count": 1,
+        "inputs": "((T([2048, 9, 9], f32), [None, T([36], i64), T([36], i64)]), {})"
+    },
+    "aten.index_put.default": {
+        "count": 1,
+        "inputs": "((T([2048, 9, 9], f32), [None, T([36], i64), T([36], i64)], T([2048, 36], f32, stride=(100, 1)), True), {})"
+    },
+    "aten.mm.default": {
+        "count": 1,
+        "inputs": "((T([512, 2048], f32, stride=(1, 512)), T([2048, 512], f32)), {})"
+    },
+    "aten.mse_loss.default": {
+        "count": 1,
+        "inputs": "((T([2048, 1], f32), T([2048, 1], f32)), {})"
+    },
+    "aten.mse_loss_backward.default": {
+        "count": 1,
+        "inputs": "((T([], f32), T([2048, 1], f32), T([2048, 1], f32), 1), {})"
+    },
+    "aten.new_zeros.default": {
+        "count": 1,
+        "inputs": "((T([2048, 36], f32, stride=(100, 1)), [2048, 9, 9]), {'dtype': f32, 'layout': torch.strided, 'device': 'cuda'})"
+    },
+    "aten.relu.default": {
+        "count": 1,
+        "inputs": "((T([2048, 1], f32),), {})"
+    },
+    "aten.sum.dim_IntList": {
+        "count": 1,
+        "inputs": "((T([2048, 512], f32), [0], True), {})"
+    },
+    "aten.threshold_backward.default": {
+        "count": 1,
+        "inputs": "((T([2048, 512], f32), T([2048, 512], f32), 0), {})"
+    }
+}

@@ -1,0 +1,226 @@
+{
+    "aten._to_copy.default": {
+        "count": 3,
+        "inputs": "((T([2], f32),), {'dtype': f32, 'layout': torch.strided, 'device': 'cuda'})"
+    },
+    "aten._unsafe_view.default": {
+        "count": 1,
+        "inputs": "((T([16, 3, 85, 13, 13], f32), [16, 255, 13, 13]), {})"
+    },
+    "aten.abs.default": {
+        "count": 1,
+        "inputs": "((T([1], f32),), {})"
+    },
+    "aten.add.Scalar": {
+        "count": 1,
+        "inputs": "((T([116, 80], f32), 1), {})"
+    },
+    "aten.add.Tensor": {
+        "count": 1,
+        "inputs": "((T([4], f32), T([4], f32)), {})"
+    },
+    "aten.add_.Tensor": {
+        "count": 1,
+        "inputs": "((T([255, 256, 1, 1], f32), T([255, 256, 1, 1], f32)), {})"
+    },
+    "aten.binary_cross_entropy_with_logits.default": {
+        "count": 1,
+        "inputs": "((T([16, 3, 52, 52], f32, stride=(689520, 229840, 4420, 85)), T([16, 3, 52, 52], f32), None, T([1], f32)), {})"
+    },
+    "aten.cat.default": {
+        "count": 1,
+        "inputs": "(([T([1], f32), T([1], f32), T([1], f32), T([1], f32)],), {})"
+    },
+    "aten.clamp.default": {
+        "count": 3,
+        "inputs": "((T([203], f32), 0), {})"
+    },
+    "aten.clone.default": {
+        "count": 3,
+        "inputs": "((T([255], f32),), {})"
+    },
+    "aten.convolution.default": {
+        "count": 1,
+        "inputs": "((T([16, 256, 52, 52], f32), T([255, 256, 1, 1], f32), T([255], f32), [1, 1], [0, 0], [1, 1], False, [0, 0], 1), {})"
+    },
+    "aten.convolution_backward.default": {
+        "count": 1,
+        "inputs": "((T([16, 32, 416, 416], f32), T([16, 3, 416, 416], f32), T([32, 3, 3, 3], f32), [0], [1, 1], [1, 1], [1, 1], False, [0, 0], 1, [False, True, False]), {})"
+    },
+    "aten.copy_.default": {
+        "count": 3,
+        "inputs": "((T([4], f32), T([4], i64)), {})"
+    },
+    "aten.cudnn_batch_norm.default": {
+        "count": 1,
+        "inputs": "((T([16, 128, 26, 26], f32), T([128], f32), T([128], f32), T([128], f32), T([128], f32), True, 0.03, 0.0001), {})"
+    },
+    "aten.cudnn_batch_norm_backward.default": {
+        "count": 1,
+        "inputs": "((T([16, 32, 416, 416], f32), T([16, 32, 416, 416], f32), T([32], f32), T([32], f32), T([32], f32), T([32], f32), T([32], f32), 0.0001, T([0], u8)), {})"
+    },
+    "aten.div.Scalar": {
+        "count": 8,
+        "inputs": "((T([116], f32), 2), {})"
+    },
+    "aten.div.Tensor": {
+        "count": 1,
+        "inputs": "((T([4], f32), 1), {})"
+    },
+    "aten.div_.Scalar": {
+        "count": 1,
+        "inputs": "((T([116, 80], f32), 9280), {})"
+    },
+    "aten.eq.Tensor": {
+        "count": 8,
+        "inputs": "((T([116], f32), T([116], f32)), {})"
+    },
+    "aten.exp.default": {
+        "count": 1,
+        "inputs": "((T([203, 2], f32, stride=(85, 1)),), {})"
+    },
+    "aten.ge.Scalar": {
+        "count": 2,
+        "inputs": "((T([116], f32), 0), {})"
+    },
+    "aten.gt.Scalar": {
+        "count": 3,
+        "inputs": "((T([3, 155], f32), 0.2), {})"
+    },
+    "aten.gt.Tensor": {
+        "count": 4,
+        "inputs": "((T([116], f32), T([116], f32)), {})"
+    },
+    "aten.index.Tensor": {
+        "count": 1,
+        "inputs": "((T([16, 3, 52, 52, 85], f32), [T([203], i64, stride=(2,)), T([203], i64), T([203], i64, stride=(2,)), T([203], i64, stride=(2,))]), {})"
+    },
+    "aten.index_put.default": {
+        "count": 1,
+        "inputs": "((T([16, 3, 13, 13, 85], f32), [T([116], i64, stride=(2,)), T([116], i64), T([116], i64, stride=(2,)), T([116], i64, stride=(2,))], T([116, 85], f32), True), {})"
+    },
+    "aten.index_put_.default": {
+        "count": 1,
+        "inputs": "((T([203, 80], f32), [T([203], i64), T([203], i64, stride=(2,))], T([], f32)), {})"
+    },
+    "aten.le.Scalar": {
+        "count": 1,
+        "inputs": "((T([116, 2], f32), 1000.0), {})"
+    },
+    "aten.leaky_relu_.default": {
+        "count": 1,
+        "inputs": "((T([16, 128, 26, 26], f32), 0.1), {})"
+    },
+    "aten.leaky_relu_backward.default": {
+        "count": 1,
+        "inputs": "((T([16, 32, 416, 416], f32), T([16, 32, 416, 416], f32), 0.1, True), {})"
+    },
+    "aten.lt.Scalar": {
+        "count": 3,
+        "inputs": "((T([], i64), 80), {})"
+    },
+    "aten.lt.Tensor": {
+        "count": 4,
+        "inputs": "((T([116], f32), T([116], f32)), {})"
+    },
+    "aten.masked_fill_.Scalar": {
+        "count": 8,
+        "inputs": "((T([116], f32), T([116], b8), 0), {})"
+    },
+    "aten.max.default": {
+        "count": 1,
+        "inputs": "((T([203], i64, stride=(2,)),), {})"
+    },
+    "aten.max_pool2d_with_indices.default": {
+        "count": 1,
+        "inputs": "((T([16, 512, 13, 13], f32), [13, 13], [1, 1], [6, 6]), {})"
+    },
+    "aten.max_pool2d_with_indices_backward.default": {
+        "count": 1,
+        "inputs": "((T([16, 512, 13, 13], f32, stride=(346112, 169, 13, 1)), T([16, 512, 13, 13], f32), [5, 5], [1, 1], [2, 2], [1, 1], False, T([16, 512, 13, 13], i64)), {})"
+    },
+    "aten.maximum.default": {
+        "count": 4,
+        "inputs": "((T([203], f32), T([203], f32)), {})"
+    },
+    "aten.mean.default": {
+        "count": 1,
+        "inputs": "((T([203], f32),), {})"
+    },
+    "aten.minimum.default": {
+        "count": 4,
+        "inputs": "((T([203], f32), T([203], f32)), {})"
+    },
+    "aten.mul.Tensor": {
+        "count": 1,
+        "inputs": "((T([4], f32), 0), {})"
+    },
+    "aten.mul_.Tensor": {
+        "count": 1,
+        "inputs": "((T([255, 256, 1, 1], f32), 0.000499825033328626), {})"
+    },
+    "aten.ne.Scalar": {
+        "count": 1,
+        "inputs": "((T([1], f32), inf), {})"
+    },
+    "aten.neg.default": {
+        "count": 14,
+        "inputs": "((T([116], f32),), {})"
+    },
+    "aten.new_zeros.default": {
+        "count": 1,
+        "inputs": "((T([116, 85], f32), [16, 3, 13, 13, 85]), {'dtype': f32, 'layout': torch.strided, 'device': 'cuda'})"
+    },
+    "aten.prod.dim_int": {
+        "count": 3,
+        "inputs": "((T([1, 155, 2], f32, stride=(930, 6, 1)), 2), {})"
+    },
+    "aten.repeat.default": {
+        "count": 3,
+        "inputs": "((T([155, 6], f32), [3, 1, 1]), {})"
+    },
+    "aten.rsub.Scalar": {
+        "count": 1,
+        "inputs": "((T([203], f32), 1.0), {})"
+    },
+    "aten.select_backward.default": {
+        "count": 2,
+        "inputs": "((T([116], f32), [4, 116], 0, 0), {})"
+    },
+    "aten.sigmoid.default": {
+        "count": 1,
+        "inputs": "((T([116, 80], f32, stride=(85, 1)),), {})"
+    },
+    "aten.sigmoid_backward.default": {
+        "count": 1,
+        "inputs": "((T([116, 2], f32, stride=(1, 116)), T([116, 2], f32)), {})"
+    },
+    "aten.slice_backward.default": {
+        "count": 1,
+        "inputs": "((T([116, 2], f32, stride=(1, 116)), [116, 85], 1, 0, 2, 1), {})"
+    },
+    "aten.sub.Tensor": {
+        "count": 2,
+        "inputs": "((T([116, 80], f32), T([116, 80], f32)), {})"
+    },
+    "aten.sum.default": {
+        "count": 9,
+        "inputs": "((T([1], f32),), {})"
+    },
+    "aten.unbind.int": {
+        "count": 1,
+        "inputs": "((T([4], f32),), {})"
+    },
+    "aten.upsample_nearest2d.default": {
+        "count": 1,
+        "inputs": "((T([16, 128, 26, 26], f32), [52, 52], 2.0, 2.0), {})"
+    },
+    "aten.upsample_nearest2d_backward.default": {
+        "count": 1,
+        "inputs": "((T([16, 256, 26, 26], f32, stride=(519168, 676, 26, 1)), [26, 26], [16, 256, 13, 13], 2.0, 2.0), {})"
+    },
+    "aten.where.self": {
+        "count": 1,
+        "inputs": "((T([116, 2], b8), T([116, 2], f32, stride=(1, 116)), T([], f32)), {})"
+    }
+}
