@@ -3,6 +3,7 @@ Load aten inputs from serialized txt files.
 """
 
 import functools
+import json
 import logging
 import math
 from collections import Counter, defaultdict
@@ -164,34 +165,27 @@ def deserialize_args(inps):
 
 
 class OperatorInputsLoader:
-    def __init__(self, op_name: str, txt_file_path: str):
+    def __init__(self, op_name: str, json_file_path: str):
         self.op_name = op_name
         self.operator_db = defaultdict(Counter)
 
-        with open(txt_file_path) as f:
-            lines = f.readlines()
+        with open(json_file_path, "r") as f:
+            obj = json.load(f)
 
-        i = 0
-        while i < len(lines):
-            op_line = lines[i].strip("\n")
-            assert "Operator: " in op_line, op_line
-            operator = op_line[len("Operator: ") :]
-            operator = (
-                operator if operator != "aten.sum.SymInt" else "aten.sum.dim_IntList"
-            )
+        for operator in obj:
             op_inps = Counter()
-            i += 1
-            while i < len(lines) and "Operator: " not in lines[i]:
+            while i < len(obj[operator]):
                 line = lines[i]
                 cnt = int(line[len("cnt: ") : line.find(",")])
                 inps = line[line.find(",") + 2 :].strip("'")
                 op_inps[inps] += cnt
-                i += 1
             self.operator_db[operator] = op_inps
+            if "embedding" in str(operator):
+                raise RuntimeError(
+                    "Embedding inputs not yet implemented, input data cannot be randomized"
+                )
         if self.op_name not in self.operator_db:
-            raise RuntimeError(f"Could not find {self.op_name} in {txt_file_path}.")
-        if "embedding" in str(operator):
-            raise RuntimeError("Embedding inputs NYI, input data cannot be randomized")
+            raise RuntimeError(f"Could not find {self.op_name} in {json_file_path}.")
 
     def get_input_iter(
         self,
