@@ -234,7 +234,10 @@ def _do_bench_profiler(
     # Benchmark phase - collect kernel times for each iteration
     all_kernel_times = []
     profiler_config = {
-        "activities": [torch.autograd.ProfilerActivity.CUDA],
+        "activities": [
+            torch.profiler.ProfilerActivity.CPU,
+            torch.profiler.ProfilerActivity.CUDA,
+        ],
         "record_shapes": False,
         "profile_memory": False,
         "with_stack": False,
