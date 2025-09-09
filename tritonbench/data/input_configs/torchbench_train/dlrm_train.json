@@ -1,0 +1,320 @@
+{
+    "aten._embedding_bag.default": [
+        {
+            "count": 2,
+            "inputs": "((T([1000000, 64], f32), T([204790], i64), T([2048], i64), False, 0, True, None), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), T([204789], i64), T([2048], i64), False, 0, True, None), {})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([1000000, 64], f32), T([204793], i64), T([2048], i64), False, 0, True, None), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), T([204784], i64), T([2048], i64), False, 0, True, None), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), T([204786], i64), T([2048], i64), False, 0, True, None), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), T([204792], i64), T([2048], i64), False, 0, True, None), {})"
+        }
+    ],
+    "aten._embedding_bag_backward.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32, stride=(576, 1)), T([204792], i64), T([2048], i64), T([204792], i64), T([2048], i64), T([0], i64), 1000000, False, 0, True, None), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32, stride=(576, 1)), T([204786], i64), T([2048], i64), T([204786], i64), T([2048], i64), T([0], i64), 1000000, False, 0, True, None), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32, stride=(576, 1)), T([204784], i64), T([2048], i64), T([204784], i64), T([2048], i64), T([0], i64), 1000000, False, 0, True, None), {})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([2048, 64], f32, stride=(576, 1)), T([204793], i64), T([2048], i64), T([204793], i64), T([2048], i64), T([0], i64), 1000000, False, 0, True, None), {})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([2048, 64], f32, stride=(576, 1)), T([204790], i64), T([2048], i64), T([204790], i64), T([2048], i64), T([0], i64), 1000000, False, 0, True, None), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32, stride=(576, 1)), T([204789], i64), T([2048], i64), T([204789], i64), T([2048], i64), T([0], i64), 1000000, False, 0, True, None), {})"
+        }
+    ],
+    "aten._sparse_coo_tensor_with_dims_and_tensors.default": [
+        {
+            "count": 1,
+            "inputs": "((1, 1, [1000000, 64], T([1, 204792], i64), T([204792, 64], f32)), {'dtype': f32, 'layout': torch.sparse_coo, 'device': 'cuda', 'pin_memory': None})"
+        },
+        {
+            "count": 1,
+            "inputs": "((1, 1, [1000000, 64], T([1, 204786], i64), T([204786, 64], f32)), {'dtype': f32, 'layout': torch.sparse_coo, 'device': 'cuda', 'pin_memory': None})"
+        },
+        {
+            "count": 1,
+            "inputs": "((1, 1, [1000000, 64], T([1, 204784], i64), T([204784, 64], f32)), {'dtype': f32, 'layout': torch.sparse_coo, 'device': 'cuda', 'pin_memory': None})"
+        },
+        {
+            "count": 2,
+            "inputs": "((1, 1, [1000000, 64], T([1, 204793], i64), T([204793, 64], f32)), {'dtype': f32, 'layout': torch.sparse_coo, 'device': 'cuda', 'pin_memory': None})"
+        },
+        {
+            "count": 2,
+            "inputs": "((1, 1, [1000000, 64], T([1, 204790], i64), T([204790, 64], f32)), {'dtype': f32, 'layout': torch.sparse_coo, 'device': 'cuda', 'pin_memory': None})"
+        },
+        {
+            "count": 1,
+            "inputs": "((1, 1, [1000000, 64], T([1, 204789], i64), T([204789, 64], f32)), {'dtype': f32, 'layout': torch.sparse_coo, 'device': 'cuda', 'pin_memory': None})"
+        }
+    ],
+    "aten.add.Tensor": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 9, 64], f32), T([2048, 9, 64], f32, stride=(576, 1, 9))), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32, stride=(100, 1)), T([2048, 64], f32, stride=(576, 1))), {})"
+        }
+    ],
+    "aten.add_.Tensor": [
+        {
+            "count": 2,
+            "inputs": "((T([1000000, 64], f32), ST([1000000, 64], f32, torch.sparse_coo, False, 204790)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), ST([1000000, 64], f32, torch.sparse_coo, False, 204789)), {'alpha': -0.01})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([1000000, 64], f32), ST([1000000, 64], f32, torch.sparse_coo, False, 204793)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), ST([1000000, 64], f32, torch.sparse_coo, False, 204784)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), ST([1000000, 64], f32, torch.sparse_coo, False, 204786)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1000000, 64], f32), ST([1000000, 64], f32, torch.sparse_coo, False, 204792)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([512, 512], f32), T([512, 512], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([512], f32), T([512], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([64, 512], f32), T([64, 512], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([64], f32), T([64], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1024, 100], f32), T([1024, 100], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([1024], f32), T([1024], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([1024, 1024], f32), T([1024, 1024], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1, 1024], f32), T([1, 1024], f32)), {'alpha': -0.01})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1], f32), T([1], f32)), {'alpha': -0.01})"
+        }
+    ],
+    "aten.addmm.default": [
+        {
+            "count": 1,
+            "inputs": "((T([512], f32), T([2048, 512], f32), T([512, 512], f32, stride=(1, 512))), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([64], f32), T([2048, 512], f32), T([512, 64], f32, stride=(1, 512))), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1024], f32), T([2048, 100], f32), T([100, 1024], f32, stride=(1, 100))), {})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([1024], f32), T([2048, 1024], f32), T([1024, 1024], f32, stride=(1, 1024))), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1], f32), T([2048, 1024], f32), T([1024, 1], f32)), {})"
+        }
+    ],
+    "aten.bmm.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 9, 64], f32), T([2048, 64, 9], f32, stride=(576, 1, 64))), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64, 9], f32, stride=(576, 1, 64)), T([2048, 9, 9], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 9, 9], f32), T([2048, 9, 64], f32)), {})"
+        }
+    ],
+    "aten.cat.default": [
+        {
+            "count": 1,
+            "inputs": "(([T([2048, 64], f32), T([2048, 64], f32), T([2048, 64], f32), T([2048, 64], f32), T([2048, 64], f32), T([2048, 64], f32), T([2048, 64], f32), T([2048, 64], f32), T([2048, 64], f32)], 1), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "(([T([2048, 64], f32), T([2048, 36], f32)], 1), {})"
+        }
+    ],
+    "aten.index.Tensor": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 9, 9], f32), [None, T([36], i64), T([36], i64)]), {})"
+        }
+    ],
+    "aten.index_put.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 9, 9], f32), [None, T([36], i64), T([36], i64)], T([2048, 36], f32, stride=(100, 1)), True), {})"
+        }
+    ],
+    "aten.mm.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 1], f32), T([1, 1024], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1, 2048], f32), T([2048, 1024], f32)), {})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([2048, 1024], f32), T([1024, 1024], f32)), {})"
+        },
+        {
+            "count": 2,
+            "inputs": "((T([1024, 2048], f32, stride=(1, 1024)), T([2048, 1024], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 1024], f32), T([1024, 100], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([1024, 2048], f32, stride=(1, 1024)), T([2048, 100], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32), T([64, 512], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([64, 2048], f32, stride=(1, 64)), T([2048, 512], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([512, 2048], f32, stride=(1, 512)), T([2048, 512], f32)), {})"
+        }
+    ],
+    "aten.mse_loss.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 1], f32), T([2048, 1], f32)), {})"
+        }
+    ],
+    "aten.mse_loss_backward.default": [
+        {
+            "count": 1,
+            "inputs": "((T([], f32), T([2048, 1], f32), T([2048, 1], f32), 1), {})"
+        }
+    ],
+    "aten.new_zeros.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 36], f32, stride=(100, 1)), [2048, 9, 9]), {'dtype': f32, 'layout': torch.strided, 'device': 'cuda'})"
+        }
+    ],
+    "aten.relu.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 512], f32),), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32),), {})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([2048, 1024], f32),), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 1], f32),), {})"
+        }
+    ],
+    "aten.sum.dim_IntList": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 1], f32), [0], True), {})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([2048, 1024], f32), [0], True), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32), [0], True), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 512], f32), [0], True), {})"
+        }
+    ],
+    "aten.threshold_backward.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2048, 1], f32), T([2048, 1], f32), 0), {})"
+        },
+        {
+            "count": 3,
+            "inputs": "((T([2048, 1024], f32), T([2048, 1024], f32), 0), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 64], f32), T([2048, 64], f32), 0), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2048, 512], f32), T([2048, 512], f32), 0), {})"
+        }
+    ]
+}

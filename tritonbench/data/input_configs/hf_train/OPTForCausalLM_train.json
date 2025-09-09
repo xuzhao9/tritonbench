@@ -1,0 +1,248 @@
+{
+    "aten._log_softmax.default": [
+        {
+            "count": 1,
+            "inputs": "((T([4094, 50272], f32), 1, False), {})"
+        }
+    ],
+    "aten._log_softmax_backward_data.default": [
+        {
+            "count": 1,
+            "inputs": "((T([4094, 50272], f32), T([4094, 50272], f32), 1, f32), {})"
+        }
+    ],
+    "aten._scaled_dot_product_efficient_attention.default": [
+        {
+            "count": 12,
+            "inputs": "((T([2, 12, 2048, 64], f32), T([2, 12, 2048, 64], f32), T([2, 12, 2048, 64], f32), None, True, 0.0, True), {'scale': 1.0})"
+        }
+    ],
+    "aten._scaled_dot_product_efficient_attention_backward.default": [
+        {
+            "count": 12,
+            "inputs": "((T([2, 12, 2048, 64], f32, stride=(1572864, 64, 768, 1)), T([2, 12, 2048, 64], f32), T([2, 12, 2048, 64], f32), T([2, 12, 2048, 64], f32), None, T([2, 12, 2048, 64], f32, stride=(1572864, 64, 768, 1)), T([2, 12, 2048], f32), T([], i64), T([], i64), 0.0, [True, True, True, False], True), {'scale': 1.0})"
+        }
+    ],
+    "aten._to_copy.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048], f32),), {'dtype': i64})"
+        }
+    ],
+    "aten._unsafe_view.default": [
+        {
+            "count": 1,
+            "inputs": "((T([4096, 50272], f32), [2, 2048, 50272]), {})"
+        }
+    ],
+    "aten.add.Tensor": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048], i64), 2), {})"
+        },
+        {
+            "count": 49,
+            "inputs": "((T([2, 2048, 768], f32), T([2, 2048, 768], f32)), {})"
+        },
+        {
+            "count": 24,
+            "inputs": "((T([4096, 768], f32), T([4096, 768], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([50272, 768], f32), T([50272, 768], f32)), {})"
+        }
+    ],
+    "aten.addmm.default": [
+        {
+            "count": 48,
+            "inputs": "((T([768], f32), T([4096, 768], f32), T([768, 768], f32, stride=(1, 768))), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([3072], f32), T([4096, 768], f32), T([768, 3072], f32, stride=(1, 768))), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([768], f32), T([4096, 3072], f32), T([3072, 768], f32, stride=(1, 3072))), {})"
+        }
+    ],
+    "aten.all.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048], b8),), {})"
+        }
+    ],
+    "aten.cumsum.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048], f32), 1), {})"
+        }
+    ],
+    "aten.embedding.default": [
+        {
+            "count": 1,
+            "inputs": "((T([50272, 768], f32), T([2, 2048], i64), 1), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2050, 768], f32), T([2, 2048], i64)), {})"
+        }
+    ],
+    "aten.embedding_dense_backward.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048, 768], f32), T([2, 2048], i64), 2050, -1, False), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048, 768], f32), T([2, 2048], i64), 50272, 1, False), {})"
+        }
+    ],
+    "aten.eq.Scalar": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048], f32), 1), {})"
+        }
+    ],
+    "aten.lt.Scalar": [
+        {
+            "count": 12,
+            "inputs": "((T([], f32), 0.0), {})"
+        }
+    ],
+    "aten.mm.default": [
+        {
+            "count": 1,
+            "inputs": "((T([4096, 768], f32), T([768, 50272], f32, stride=(1, 768))), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([50272, 4096], f32, stride=(1, 50272)), T([4096, 768], f32)), {})"
+        },
+        {
+            "count": 1,
+            "inputs": "((T([4096, 50272], f32), T([50272, 768], f32)), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([4096, 768], f32), T([768, 3072], f32)), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([768, 4096], f32, stride=(1, 768)), T([4096, 3072], f32)), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([4096, 3072], f32), T([3072, 768], f32)), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([3072, 4096], f32, stride=(1, 3072)), T([4096, 768], f32)), {})"
+        },
+        {
+            "count": 48,
+            "inputs": "((T([4096, 768], f32), T([768, 768], f32)), {})"
+        },
+        {
+            "count": 48,
+            "inputs": "((T([768, 4096], f32, stride=(1, 768)), T([4096, 768], f32)), {})"
+        }
+    ],
+    "aten.mul.Tensor": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048], f32), T([2, 2048], f32)), {})"
+        },
+        {
+            "count": 24,
+            "inputs": "((T([2, 2048, 768], f32), 0.125), {})"
+        }
+    ],
+    "aten.native_dropout.default": [
+        {
+            "count": 12,
+            "inputs": "((T([2, 2048, 768], f32), 0.1, True), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([4096, 768], f32), 0.1, True), {})"
+        }
+    ],
+    "aten.native_dropout_backward.default": [
+        {
+            "count": 12,
+            "inputs": "((T([4096, 768], f32), T([4096, 768], b8), 1.1111111111111112), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([2, 2048, 768], f32), T([2, 2048, 768], b8), 1.1111111111111112), {})"
+        }
+    ],
+    "aten.native_layer_norm.default": [
+        {
+            "count": 13,
+            "inputs": "((T([2, 2048, 768], f32), [768], T([768], f32), T([768], f32), 1e-05), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([4096, 768], f32), [768], T([768], f32), T([768], f32), 1e-05), {})"
+        }
+    ],
+    "aten.native_layer_norm_backward.default": [
+        {
+            "count": 13,
+            "inputs": "((T([2, 2048, 768], f32), T([2, 2048, 768], f32), [768], T([2, 2048, 1], f32), T([2, 2048, 1], f32), T([768], f32), T([768], f32), [True, True, True]), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([4096, 768], f32), T([4096, 768], f32), [768], T([4096, 1], f32), T([4096, 1], f32), T([768], f32), T([768], f32), [True, True, True]), {})"
+        }
+    ],
+    "aten.nll_loss_backward.default": [
+        {
+            "count": 1,
+            "inputs": "((T([], f32), T([4094, 50272], f32), T([4094], i64), None, 1, -100, T([], f32)), {})"
+        }
+    ],
+    "aten.nll_loss_forward.default": [
+        {
+            "count": 1,
+            "inputs": "((T([4094, 50272], f32), T([4094], i64), None, 1, -100), {})"
+        }
+    ],
+    "aten.relu.default": [
+        {
+            "count": 12,
+            "inputs": "((T([4096, 3072], f32),), {})"
+        }
+    ],
+    "aten.slice_backward.default": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2047, 50272], f32), [2, 2048, 50272], 1, 0, -1, 1), {})"
+        }
+    ],
+    "aten.sub.Tensor": [
+        {
+            "count": 1,
+            "inputs": "((T([2, 2048], f32), 1), {})"
+        }
+    ],
+    "aten.sum.dim_IntList": [
+        {
+            "count": 60,
+            "inputs": "((T([4096, 768], f32), [0], True), {})"
+        },
+        {
+            "count": 12,
+            "inputs": "((T([4096, 3072], f32), [0], True), {})"
+        }
+    ],
+    "aten.threshold_backward.default": [
+        {
+            "count": 12,
+            "inputs": "((T([4096, 3072], f32), T([4096, 3072], f32), 0), {})"
+        }
+    ]
+}
