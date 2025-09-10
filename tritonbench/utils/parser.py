@@ -170,8 +170,9 @@ def get_parser(args=None):
     )
     parser.add_argument(
         "--dump-ir",
-        action="store_true",
-        help="Dump Triton IR",
+        type=str,
+        default=None,
+        help="Dump Triton IR to specific directory.",
     )
     parser.add_argument(
         "--gpu-lockdown",

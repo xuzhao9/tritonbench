@@ -14,6 +14,7 @@ import yaml
 
 from tritonbench.utils.env_utils import is_fbcode
 from tritonbench.utils.git_utils import get_branch, get_commit_time, get_current_hash
+from tritonbench.utils.parser import get_parser
 from tritonbench.utils.path_utils import (
     add_cmd_parameter,
     remove_cmd_parameter,
@@ -21,6 +22,16 @@ from tritonbench.utils.path_utils import (
 )
 
 BENCHMARKS_OUTPUT_DIR = REPO_PATH.joinpath(".benchmarks")
+FWD_ONLY_OPS = ["triton_dot_compress", "triton_group_index_select"]
+BWD_ARGS_OPS = {
+    # flash_attention/triton_tutorial_flash_v2 does not support non-causal in backward
+    "flash_attention": ["--causal"],
+    # pffn_baseline does not support backward
+    "generalized_dot_product_attention": [
+        "--skip",
+        "pffn_baseline,mkl_jfav3",
+    ],
+}
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -109,6 +120,27 @@ def run_config(config_file: str):
         )
 
 
+def run_one_operator(task_args: List[str], with_bwd: bool = False):
+    from tritonbench.operators import (  # @manual=//pytorch/tritonbench:tritonbench
+        load_opbench_by_name,
+    )
+
+    parser = get_parser(task_args)
+    tb_args, extra_args = parser.parse_known_args(task_args)
+    Operator = load_opbench_by_name(tb_args.op)
+
+    op = Operator(tb_args=tb_args, extra_args=extra_args)
+    op.run()
+    if with_bwd and op.has_bwd() and not tb_args.op in FWD_ONLY_OPS:
+        del op
+        if tb_args.op in BWD_ARGS_OPS:
+            task_args.extend(BWD_ARGS_OPS[tb_args.op])
+            tb_args, extra_args = parser.parse_known_args(task_args)
+        tb_args.mode = "bwd"
+        op = Operator(tb_args=tb_args, extra_args=extra_args)
+        op.run()
+
+
 def run_in_task(
     op: Optional[str],
     op_args: Optional[List[str]] = None,
@@ -125,6 +157,8 @@ def run_in_task(
         add_cmd_parameter(copy_sys_argv, "--op", op)
         op_task_cmd.extend(copy_sys_argv)
     else:
+        if is_fbcode():
+            op_task_cmd.append(sys.argv[0])
         op_task_cmd.extend(op_args)
     if benchmark_name:
         op_args.extend(["--benchmark-name", benchmark_name])

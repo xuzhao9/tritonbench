@@ -1,7 +1,9 @@
 import importlib
 import os
 import pathlib
-from typing import List
+from typing import Dict, List
+
+import yaml
 
 OPBENCH_DIR = "operators"
 INTERNAL_OPBENCH_DIR = "fb"
@@ -48,6 +50,28 @@ def list_operators() -> List[str]:
     if INTERNAL_OPBENCH_DIR in operators:
         operators.remove(INTERNAL_OPBENCH_DIR)
     return operators
+
+
+def list_custom_triton_operators(
+    custom_triton_yamls: List[str],
+) -> Dict[str, List[str]]:
+    """List all custom Triton operators"""
+    import torch
+
+    def is_fbcode() -> bool:
+        return not hasattr(torch.version, "git_version")
+
+    triton_ops = {}
+    for custom_triton_yaml in custom_triton_yamls:
+        with open(custom_triton_yaml, "r") as fp:
+            custom_triton_metadata = yaml.safe_load(fp)
+        if not is_fbcode() and "oss_only" in custom_triton_metadata:
+            triton_ops.update(custom_triton_metadata["oss_only"])
+        if is_fbcode() and "internal" in custom_triton_metadata:
+            triton_ops.update(custom_triton_metadata["internal"])
+        if "triton_ops" in custom_triton_metadata:
+            triton_ops.update(custom_triton_metadata["triton_ops"])
+    return triton_ops
 
 
 def load_opbench_by_name(op_name: str):

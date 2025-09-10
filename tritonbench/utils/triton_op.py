@@ -60,7 +60,7 @@ except ImportError:
     tqdm = None
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logger.setLevel(logging.INFO)
 
 
 @dataclass
@@ -1542,7 +1542,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                         fn, self.example_inputs, metrics
                     )
             if self.tb_args.dump_ir:
-                self.dump_ir(input_id, fn)
+                self.dump_ir(input_id, fn, self.tb_args.dump_ir)
         except torch.cuda.OutOfMemoryError:
             metrics.error_msg = "CUDA OOM"
         except NotImplementedError as e:
@@ -1924,7 +1924,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
         op_flops = self._op_flops[fn]
         return op_flops / metrics.latency / 1e12 * 1e3
 
-    def dump_ir(self, input_id, fn):
+    def dump_ir(self, input_id, fn, output_dir):
         from unittest import mock
 
         from triton.runtime.jit import JITFunction
@@ -1942,20 +1942,21 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
             fn()
 
         if len(compiled_kernels) > 0:
-            ir_dir = self.get_temp_path(fn._name)
+            ir_dir = Path(output_dir) / self.benchmark_name / fn._name
             ir_dir.mkdir(parents=True, exist_ok=True)
             logger.info(
                 "Writing %s Triton IRs to %s",
                 str(len(compiled_kernels)),
                 ir_dir,
             )
+        else:
+            logger.info("No Triton IRs found")
 
         for kid, kernel in enumerate(compiled_kernels):
             for ir in ["ttir", "ttgir", "llir", "ptx", "amdgcn"]:
                 if ir in kernel.asm:
                     with open(
-                        ir_dir
-                        / f"{fn._name}_{kernel.name}_k{kid}_input_x{input_id}.{ir}",
+                        ir_dir / f"{kernel.name}_k{kid}_input_x{input_id}.{ir}",
                         "w",
                     ) as f:
                         f.write(kernel.asm[ir])
@@ -1963,9 +1964,7 @@ class BenchmarkOperator(metaclass=PostInitProcessor):
                 from triton.tools.disasm import get_sass
 
                 sass = get_sass(kernel.asm["cubin"])
-                with open(
-                    ir_dir / f"{fn._name}_{kernel.name}_k{kid}_x{input_id}.sass", "w"
-                ) as f:
+                with open(ir_dir / f"{kernel.name}_k{kid}_x{input_id}.sass", "w") as f:
                     f.write(sass)
 
     @classmethod
