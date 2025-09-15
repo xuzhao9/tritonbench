@@ -9,7 +9,7 @@ import triton.language.extra.tlx as tlx
 from triton.tools.tensor_descriptor import TensorDescriptor
 
 from .gdpa_utils import get_num_sms
-from .math import activation_string_to_int
+from .math import activation_string_to_int, fast_gelu_grad, gelu, gelu_grad
 
 
 def _host_descriptor_pre_hook(nargs):
@@ -348,6 +348,12 @@ def gdpa_kernel_tma_ws_blackwell(
     qk1_buf = tlx.local_alloc(
         (BLOCK_M // 2, HEAD_DIM), tl.float32, 1, tlx.storage_kind.tmem
     )
+    p0_buf = tlx.local_alloc(
+        (BLOCK_M // 2, HEAD_DIM), dtype, 1, tlx.storage_kind.tmem, reuse=qk0_buf
+    )
+    p1_buf = tlx.local_alloc(
+        (BLOCK_M // 2, HEAD_DIM), dtype, 1, tlx.storage_kind.tmem, reuse=qk1_buf
+    )
     o0_buf = tlx.local_alloc(
         (BLOCK_M // 2, HEAD_DIM), tl.float32, 1, tlx.storage_kind.tmem
     )
@@ -438,14 +444,17 @@ def gdpa_kernel_tma_ws_blackwell(
                         # p0 = fast_gelu(qk0)
                         p0 = _fma_f32x2(qk0, tanh_approx_fp32(inner0), qk0)
                         p0 = p0.to(dtype)
-                        p0_view = tlx.local_reinterpret(qk_view_1st, dtype)
-                        tlx.local_store(p0_view, p0)
+                        p0_view = tlx.local_view(p0_buf, bufIdx)
+                        p0_view_1st = tlx.subslice(p0_view, 0, HEAD_DIM // 2)
+                        tlx.local_store(p0_view_1st, p0)
 
                         # p1 = fast_gelu(qk1)
                         p1 = _fma_f32x2(qk1, tanh_approx_fp32(inner1), qk1)
                         p1 = p1.to(dtype)
-                        p1_view = tlx.local_reinterpret(qk_view_2nd, dtype)
-                        tlx.local_store(p1_view, p1)
+                        p0_view_2nd = tlx.subslice(
+                            p0_view, HEAD_DIM // 2, HEAD_DIM // 2
+                        )
+                        tlx.local_store(p0_view_2nd, p1)
 
                         # p and qk reuse tmem space, single producer commit for p via consumer_release_qk
                         consumer_release_qk_view = tlx.local_view(producer_qk0, bufIdx)
@@ -551,14 +560,17 @@ def gdpa_kernel_tma_ws_blackwell(
                         # p0 = fast_gelu(qk0)
                         p0 = _fma_f32x2(qk0, tanh_approx_fp32(inner0), qk0)
                         p0 = p0.to(dtype)
-                        p0_view = tlx.local_reinterpret(qk_view_1st, dtype)
-                        tlx.local_store(p0_view, p0)
+                        p1_view = tlx.local_view(p1_buf, bufIdx)
+                        p1_view_1st = tlx.subslice(p1_view, 0, HEAD_DIM // 2)
+                        tlx.local_store(p1_view_1st, p0)
 
                         # p1 = fast_gelu(qk1)
                         p1 = _fma_f32x2(qk1, tanh_approx_fp32(inner1), qk1)
                         p1 = p1.to(dtype)
-                        p1_view = tlx.local_reinterpret(qk_view_2nd, dtype)
-                        tlx.local_store(p1_view, p1)
+                        p1_view_2nd = tlx.subslice(
+                            p1_view, HEAD_DIM // 2, HEAD_DIM // 2
+                        )
+                        tlx.local_store(p1_view_2nd, p1)
 
                         # p and qk reuse tmem space, single producer commit for p via consumer_release_qk
                         consumer_release_qk_view = tlx.local_view(producer_qk1, bufIdx)
@@ -727,8 +739,7 @@ def gdpa_kernel_tma_ws_blackwell(
                         consumer_p0_view, phase_p
                     )  # consumer wait for p0 due to reuse of p0 and qk0
                     # reinterpret qk0 as p0
-                    qk_view = tlx.local_view(qk0_buf, bufIdx_p)
-                    p0_view = tlx.local_reinterpret(qk_view, dtype)
+                    p0_view = tlx.local_view(p0_buf, bufIdx_p)
 
                     bufIdx_o, phase_o = _get_bufidx_phase(accum_cnt_o, NUM_BUFFERS_O)
                     producer_commit_o0_view = tlx.local_view(
@@ -818,8 +829,7 @@ def gdpa_kernel_tma_ws_blackwell(
                             consumer_release_kv, bufIdx_v
                         )
                         # reinterpret as p1
-                        qk_view = tlx.local_view(qk1_buf, bufIdx_qk1)
-                        p1_view = tlx.local_reinterpret(qk_view, dtype)
+                        p1_view = tlx.local_view(p1_buf, bufIdx_qk1)
                         tlx.async_dot(  # p1 . v from previous iteration
                             p1_view,
                             v_view,
@@ -877,9 +887,6 @@ def gdpa_kernel_tma_ws_blackwell(
                         tlx.barrier_wait(
                             consumer_p0_view, phase_qk
                         )  # consumer wait for p0 use producer_qk0 due to reuse
-                        # reinterpret as p0
-                        qk_view = tlx.local_view(qk0_buf, bufIdx_qk)
-                        p0_view = tlx.local_reinterpret(qk_view, dtype)
 
                         v_view = tlx.local_view(kv_buf, bufIdx_v)
                         bufIdx_o, phase_o = _get_bufidx_phase(
@@ -890,7 +897,7 @@ def gdpa_kernel_tma_ws_blackwell(
                         )
                         o0_view = tlx.local_view(o0_buf, bufIdx_o)
                         tlx.async_dot(
-                            p0_view,
+                            p0_buf[bufIdx_qk],
                             v_view,
                             o0_view,
                             use_acc=True,
@@ -926,8 +933,6 @@ def gdpa_kernel_tma_ws_blackwell(
                     tlx.barrier_wait(
                         consumer_p1_view, phase_qk1
                     )  # consumer wait for p1 due to reuse of p1 and qk1
-                    qk_view = tlx.local_view(qk1_buf, bufIdx_qk1)
-                    p1_view = tlx.local_reinterpret(qk_view, dtype)
 
                     accum_cnt_qk1 += 1
                     # release p0, p1 via producer_commit_qk0, qk1 barriers
@@ -948,7 +953,7 @@ def gdpa_kernel_tma_ws_blackwell(
                     )
                     o1_view = tlx.local_view(o1_buf, bufIdx_o)
                     tlx.async_dot(  # p1 . v in last iteration
-                        p1_view,
+                        p1_buf[bufIdx_qk1],
                         v_view,
                         o1_view,
                         use_acc=not first,
@@ -1364,3 +1369,725 @@ def gdpa_forward_tlx(
         **extra_kern_args,
     )
     return o
+
+
+@triton.jit
+def _gdpa_bwd_tlx_compute_num_steps(
+    start_n,
+    qlen,
+    BLOCK_M1: tl.constexpr,
+    BLOCK_N1: tl.constexpr,
+    WINDOW_SIZE: tl.constexpr,
+):
+    start_m_inner = 0
+    num_steps = tl.cdiv((qlen - start_m_inner), BLOCK_M1)
+    if WINDOW_SIZE is not None:
+        start_m_inner = (
+            max(start_m_inner, start_n - WINDOW_SIZE) // BLOCK_M1
+        ) * BLOCK_M1
+        end_m_inner = (
+            tl.cdiv(min(qlen, start_n + BLOCK_N1 + WINDOW_SIZE), BLOCK_M1) * BLOCK_M1
+        )
+        num_steps = (end_m_inner - start_m_inner) // BLOCK_M1
+    return num_steps
+
+
+@triton.jit
+def _gdpa_bwd_tlx_compute_activation(
+    desc_q,
+    DK,
+    DV,
+    k_tiles,
+    v_tiles,
+    qk_tiles,
+    dpT_tiles,
+    ppT_tiles,
+    dsT_tiles,
+    dv_tiles,
+    dk_tiles,
+    qk_fulls,
+    dpT_fulls,
+    ppT_fulls,
+    dsT_fulls,
+    dv_fulls,
+    dk_fulls,
+    accum_cnt_outer,
+    accum_cnt_inner,
+    stride_km,
+    stride_d,
+    start_n,
+    start_m,
+    qlen,
+    klen,
+    HEAD_DIM: tl.constexpr,
+    BLOCK_D: tl.constexpr,
+    BLOCK_M1: tl.constexpr,
+    BLOCK_N1: tl.constexpr,
+    MASK: tl.constexpr,
+    WINDOW_SIZE: tl.constexpr,
+    NUM_BUFFERS_TMEM: tl.constexpr,
+    activation_enum_int: tl.constexpr,
+):
+    dkv_buf_id, dkv_phase = _get_bufidx_phase(accum_cnt_outer, NUM_BUFFERS_TMEM)
+    dk_tile = tlx.local_view(dk_tiles, dkv_buf_id)
+    dv_tile = tlx.local_view(dv_tiles, dkv_buf_id)
+    dk_full = tlx.local_view(dk_fulls, dkv_buf_id)
+    dv_full = tlx.local_view(dv_fulls, dkv_buf_id)
+
+    offs_m = start_m + tl.arange(0, BLOCK_M1)
+    offs_n = start_n + tl.arange(0, BLOCK_N1)
+
+    num_steps = _gdpa_bwd_tlx_compute_num_steps(
+        qlen, start_n, BLOCK_M1, BLOCK_N1, WINDOW_SIZE
+    )
+
+    for i in tl.range(0, num_steps, 1, loop_unroll_factor=1):
+        tmem_buf_id, tmem_phase = _get_bufidx_phase(
+            accum_cnt_inner + i, NUM_BUFFERS_TMEM
+        )
+        qk_tile = tlx.local_view(qk_tiles, tmem_buf_id)
+        ppT_tile = tlx.local_view(ppT_tiles, tmem_buf_id)
+        dpT_tile = tlx.local_view(dpT_tiles, tmem_buf_id)
+        dsT_tile = tlx.local_view(dsT_tiles, tmem_buf_id)
+        qk_full = tlx.local_view(qk_fulls, tmem_buf_id)
+        ppT_full = tlx.local_view(ppT_fulls, tmem_buf_id)
+        dpT_full = tlx.local_view(dpT_fulls, tmem_buf_id)
+        dsT_full = tlx.local_view(dsT_fulls, tmem_buf_id)
+
+        # wait for qkT = tl.dot(k, qT)
+        tlx.barrier_wait(qk_full, tmem_phase)
+        pT = tlx.local_load(qk_tile)
+
+        # Autoregressive masking.
+        if MASK:
+            mask = offs_m[None, :] >= offs_n[:, None]
+            pT = tl.where(mask, pT, 0.0)
+        # Sliding window masking.
+        if WINDOW_SIZE is not None:
+            window_mask = tl.abs(offs_m[None, :] - offs_n[:, None]) <= WINDOW_SIZE
+            pT = tl.where(window_mask, pT, 0.0)
+        # Compute dV.
+        if activation_enum_int == 0:
+            ppT = pT
+        elif activation_enum_int == 1:
+            ppT = gelu(pT)
+        elif activation_enum_int == 2:
+            tanh_out = tanh_approx_fp32(0.7978845608 * pT * (1 + 0.044715 * pT * pT))
+            ppT = 0.5 * pT * (1 + tanh_out)
+        else:
+            # rest of the enums are not supported yet
+            ppT = pT
+        # ppT *= qk_scale
+        ppT = ppT.to(tlx.dtype_of(desc_q))
+        tlx.local_store(ppT_tile, ppT)
+        tlx.barrier_arrive(ppT_full)
+
+        ##
+        if activation_enum_int == 0:
+            pT = 1.0
+        elif activation_enum_int == 1:
+            # activation = gelu TypeError("cannot convert JITFunction(ads_mkl.ops.triton.math:gelu) of type <class 'triton.runtime.jit.JITFunction'> to tensor")
+            pT = gelu_grad(pT)
+        elif activation_enum_int == 2:
+            pT = (
+                0.5
+                * pT
+                * (1 - tanh_out * tanh_out)
+                * (0.7978845608 + 0.1070322243 * pT * pT)
+            ) + 0.5 * (1 + tanh_out)
+        else:
+            pT = 1
+        # pT *= qk_scale
+
+        # Autoregressive masking.
+        if MASK:
+            mask = offs_m[None, :] >= offs_n[:, None]
+            pT = tl.where(mask, pT, 0.0)
+        # Sliding window masking.
+        if WINDOW_SIZE is not None:
+            window_mask = tl.abs(offs_m[None, :] - offs_n[:, None]) <= WINDOW_SIZE
+            pT = tl.where(window_mask, pT, 0.0)
+
+        # Wait for dpT = tl.dot(v, tl.trans(do))
+        tlx.barrier_wait(dpT_full, tmem_phase)
+        dpT = tlx.local_load(dpT_tile)
+        dsT = pT * dpT
+        # TODO: release dpT
+
+        dsT = dsT.to(tlx.dtype_of(desc_q))
+        tlx.local_store(dsT_tile, dsT)
+        tlx.barrier_arrive(dsT_full)
+
+    offs_k = tl.arange(0, BLOCK_D)
+    kmask = (offs_k[None, :] < HEAD_DIM) & (offs_n[:, None] < klen)
+
+    # Write back dV.
+    tlx.barrier_wait(dv_full, dkv_phase)
+    dv_r = tlx.local_load(dv_tile)
+    dv_ptrs = DV + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d
+    tl.store(dv_ptrs, dv_r, mask=kmask)
+
+    # Write back dK.
+    tlx.barrier_wait(dk_full, dkv_phase)
+    dk_r = tlx.local_load(dk_tile)
+    dk_ptrs = DK + offs_n[:, None] * stride_km + offs_k[None, :] * stride_d
+    tl.store(dk_ptrs, dk_r, mask=kmask)
+
+    return num_steps
+
+
+@triton.jit
+def bwd_caculate_offsets(
+    seq_index,
+    H,
+    G,
+    SORT_BY_SEQ_LENGTH: tl.constexpr,
+    BROADCAST_Q: tl.constexpr,
+):
+    off_z = tl.program_id(2)
+    if SORT_BY_SEQ_LENGTH:
+        off_z = tl.load(seq_index + off_z)
+    if BROADCAST_Q:
+        off_q_z = 0
+    else:
+        off_q_z = off_z
+
+    off_seq_h = tl.program_id(0)
+    off_h = off_seq_h % H
+    off_h_kv = off_h // G
+    pid = off_seq_h // H
+
+    return off_z, off_h, off_h_kv, off_q_z, pid
+
+
+@triton.jit
+def bwd_caculate_tile_num(
+    Z,
+    H,
+    N_CTX: tl.constexpr,
+    N_CTX_KV: tl.constexpr,
+    BLOCK_N1: tl.constexpr,
+    BLOCK_M2: tl.constexpr,
+):
+    n_tile_num = max(tl.cdiv(N_CTX_KV, BLOCK_N1), tl.cdiv(N_CTX, BLOCK_M2))
+    prog_id = tl.program_id(0)
+    num_progs = tl.num_programs(0)
+    total_tiles = n_tile_num * Z * H
+    tiles_per_sm = total_tiles // num_progs
+    if prog_id < total_tiles % num_progs:
+        tiles_per_sm += 1
+    return tiles_per_sm, n_tile_num
+
+
+def _bwd_host_descriptor_pre_hook(nargs):
+    if not isinstance(nargs["desc_q"], TensorDescriptor):
+        return
+    BLOCK_M1 = nargs["BLOCK_M1"]
+    BLOCK_N1 = nargs["BLOCK_N1"]
+    BLOCK_D = nargs["BLOCK_D"]
+    nargs["desc_q"].block_shape = [BLOCK_M1, BLOCK_D]
+    nargs["desc_v"].block_shape = [BLOCK_N1, BLOCK_D]
+    nargs["desc_k"].block_shape = [BLOCK_N1, BLOCK_D]
+    nargs["desc_do"].block_shape = [BLOCK_M1, BLOCK_D]
+    nargs["desc_dq"].block_shape = [BLOCK_M1, BLOCK_D]
+
+
+def get_tlx_bwd_autotune_config():
+    return [
+        triton.Config(
+            {
+                "BLOCK_M1": BM,
+                "BLOCK_N1": BN,
+                "BLOCK_M2": BN,
+                "BLOCK_N2": BM,
+                "NUM_BUFFERS_KV": 1,
+                "NUM_BUFFERS_Q": 1,
+                "NUM_BUFFERS_DO": 1,
+                "NUM_BUFFERS_DS": 1,
+                "NUM_BUFFERS_TMEM": 1,
+            },
+            num_warps=4,
+            num_stages=1,
+            pre_hook=_bwd_host_descriptor_pre_hook,
+        )
+        for BM in [128]  # 128 or 256
+        for BN in [128]
+    ]
+
+
+@triton.jit
+def gdpa_backward_tlx(
+    desc_q,
+    Q_offsets,
+    desc_k,
+    K_offsets,
+    desc_v,
+    seq_index,  #
+    desc_do,  #
+    Out_offsets,
+    desc_dq,
+    DK,
+    DV,  #
+    stride_qm,
+    stride_km,
+    stride_qh,
+    stride_kh,
+    stride_d,
+    stride_dom,
+    stride_doh,
+    Z,
+    H,
+    G,
+    N_CTX,  #
+    N_CTX_KV,  #
+    qk_scale,  #
+    FUSED_QKV: tl.constexpr,  #
+    FUSED_KV: tl.constexpr,  #
+    SORT_BY_SEQ_LENGTH: tl.constexpr,  #
+    BLOCK_D: tl.constexpr,  #
+    HEAD_DIM: tl.constexpr,
+    BLOCK_M1: tl.constexpr,  #
+    BLOCK_N1: tl.constexpr,  #
+    BLOCK_M2: tl.constexpr,  #
+    BLOCK_N2: tl.constexpr,  #
+    USE_START_END_OFFSETS: tl.constexpr,
+    WINDOW_SIZE: tl.constexpr,
+    BROADCAST_Q: tl.constexpr,
+    USE_DQ_ATOMIC_ADD: tl.constexpr,
+    NUM_BUFFERS_KV: tl.constexpr,
+    NUM_BUFFERS_Q: tl.constexpr,
+    NUM_BUFFERS_DO: tl.constexpr,
+    NUM_BUFFERS_DS: tl.constexpr,
+    NUM_BUFFERS_TMEM: tl.constexpr,
+    enable_tma: tl.constexpr,
+    IS_DENSE_KV: tl.constexpr,
+    activation_enum_int: tl.constexpr,
+):
+    # allocate smem buffers
+    k_tiles = tlx.local_alloc((BLOCK_N1, BLOCK_D), tlx.dtype_of(desc_k), NUM_BUFFERS_KV)
+    v_tiles = tlx.local_alloc((BLOCK_N1, BLOCK_D), tlx.dtype_of(desc_v), NUM_BUFFERS_KV)
+    q_tiles = tlx.local_alloc((BLOCK_M1, BLOCK_D), tlx.dtype_of(desc_q), NUM_BUFFERS_Q)
+    do_tiles = tlx.local_alloc(
+        (BLOCK_M1, BLOCK_D), tlx.dtype_of(desc_do), NUM_BUFFERS_DO
+    )
+    dsT_tiles = tlx.local_alloc(
+        (BLOCK_N1, BLOCK_D), tlx.dtype_of(desc_q), NUM_BUFFERS_DS
+    )
+
+    # allocate barriers for smem buffers
+    k_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_KV)
+    v_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_KV)
+    q_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_Q)
+    do_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_DO)
+    dsT_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_DS)
+    q_empties = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_Q)
+    do_empties = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_DO)
+    dsT_empties = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_DS)
+
+    # allocate tmem buffers
+    qk_tiles = tlx.local_alloc(
+        (BLOCK_N1, BLOCK_D), tl.float32, NUM_BUFFERS_TMEM, tlx.storage_kind.tmem
+    )
+    ppT_tiles = tlx.local_alloc(
+        (BLOCK_N1, BLOCK_D),
+        tlx.dtype_of(desc_do),
+        NUM_BUFFERS_TMEM,
+        tlx.storage_kind.tmem,
+        reuse=qk_tiles,
+    )
+    dpT_tiles = tlx.local_alloc(
+        (BLOCK_N1, BLOCK_D),
+        tl.float32,
+        NUM_BUFFERS_TMEM,
+        tlx.storage_kind.tmem,
+        reuse=qk_tiles,
+    )
+    dv_tiles = tlx.local_alloc(
+        (BLOCK_N1, BLOCK_D), tl.float32, NUM_BUFFERS_TMEM, tlx.storage_kind.tmem
+    )
+    dk_tiles = tlx.local_alloc(
+        (BLOCK_N1, BLOCK_D), tl.float32, NUM_BUFFERS_TMEM, tlx.storage_kind.tmem
+    )
+    dq_tiles = tlx.local_alloc(
+        (BLOCK_M1, BLOCK_D), tl.float32, NUM_BUFFERS_TMEM, tlx.storage_kind.tmem
+    )
+
+    # allocate barriers for tmem buffers
+    qk_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+    ppT_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+    dpT_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+    dv_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+    dk_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+    dq_fulls = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+    ppT_empties = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+    dq_empties = tlx.alloc_barriers(num_barriers=NUM_BUFFERS_TMEM)
+
+    with tlx.async_tasks():
+        # activation
+        with tlx.async_task("default"):
+            off_z, off_h, off_h_kv, off_q_z, pid = bwd_caculate_offsets(
+                seq_index,
+                H,
+                G,
+                SORT_BY_SEQ_LENGTH,
+                BROADCAST_Q,
+            )
+
+            begin_q = tl.load(Q_offsets + off_q_z)
+            end_q = tl.load(Q_offsets + off_q_z + 1)
+            start_n = pid * BLOCK_N1
+            start_m = pid * BLOCK_M2
+            off_h2 = off_h.to(tl.int64)
+            qlen = end_q - begin_q
+            if FUSED_QKV:
+                begin_k = begin_q
+                end_k = end_q
+                klen = qlen
+            else:
+                begin_k = tl.load(K_offsets + off_z)
+                end_k = tl.load(K_offsets + off_z + 1)
+                klen = end_k - begin_k
+
+            if start_n < klen:
+                _gdpa_bwd_tlx_compute_activation(
+                    desc_q=desc_q,
+                    DK=DK,
+                    DV=DV,
+                    k_tiles=k_tiles,
+                    v_tiles=v_tiles,
+                    qk_tiles=qk_tiles,
+                    dpT_tiles=dpT_tiles,
+                    ppT_tiles=ppT_tiles,
+                    dsT_tiles=dsT_tiles,
+                    dv_tiles=dv_tiles,
+                    dk_tiles=dk_tiles,
+                    qk_fulls=qk_fulls,
+                    dpT_fulls=dpT_fulls,
+                    ppT_fulls=ppT_fulls,
+                    dsT_fulls=dsT_fulls,
+                    dv_fulls=dv_fulls,
+                    dk_fulls=dk_fulls,
+                    accum_cnt_outer=0,
+                    accum_cnt_inner=0,
+                    stride_km=stride_km,
+                    stride_d=stride_d,
+                    start_n=start_n,
+                    start_m=start_m,
+                    qlen=qlen,
+                    klen=klen,
+                    HEAD_DIM=HEAD_DIM,
+                    BLOCK_D=BLOCK_D,
+                    BLOCK_M1=BLOCK_M1,
+                    BLOCK_N1=BLOCK_N1,
+                    MASK=False,
+                    WINDOW_SIZE=WINDOW_SIZE,
+                    NUM_BUFFERS_TMEM=NUM_BUFFERS_TMEM,
+                    activation_enum_int=activation_enum_int,
+                )
+
+        # reduction
+        with tlx.async_task(num_warps=4):
+            off_z, off_h, off_h_kv, off_q_z, pid = bwd_caculate_offsets(
+                seq_index,
+                H,
+                G,
+                SORT_BY_SEQ_LENGTH,
+                BROADCAST_Q,
+            )
+
+            begin_q = tl.load(Q_offsets + off_q_z)
+            end_q = tl.load(Q_offsets + off_q_z + 1)
+            start_n = pid * BLOCK_N1
+            start_m = pid * BLOCK_M2
+            off_h2 = off_h.to(tl.int64)
+            qlen = end_q - begin_q
+            if FUSED_QKV:
+                begin_k = begin_q
+                end_k = end_q
+                klen = qlen
+            else:
+                begin_k = tl.load(K_offsets + off_z)
+                end_k = tl.load(K_offsets + off_z + 1)
+                klen = end_k - begin_k
+
+            if start_n < klen:
+                curr_m = start_m
+                step_m = BLOCK_M1
+                num_steps = _gdpa_bwd_tlx_compute_num_steps(
+                    qlen, start_n, BLOCK_M1, BLOCK_N1, WINDOW_SIZE
+                )
+
+                for i in tl.range(0, num_steps, 1, loop_unroll_factor=1):
+                    tmem_buf_id, tmem_phase = _get_bufidx_phase(i, NUM_BUFFERS_TMEM)
+                    dq_tile = tlx.local_view(dq_tiles, tmem_buf_id)
+                    dq_full = tlx.local_view(dq_fulls, tmem_buf_id)
+                    dq_empty = tlx.local_view(dq_empties, tmem_buf_id)
+
+                    # wait for dq = tl.dot(tl.trans(dsT), k)
+                    tlx.barrier_wait(dq_full, tmem_phase)
+                    dq_r = tlx.local_load(dq_tile)
+                    dq_r = dq_r.to(tlx.dtype_of(desc_dq))
+                    desc_dq.atomic_add(
+                        [
+                            (begin_q + curr_m).to(tl.int32),
+                            (off_h2 * stride_qh).to(tl.int32),
+                        ],
+                        dq_r,
+                    )
+
+                    # release dq
+                    tlx.barrier_arrive(dq_empty)
+
+                    # Increment pointers.
+                    curr_m += step_m
+
+        # mma
+        with tlx.async_task(num_warps=1):
+            off_z, off_h, off_h_kv, off_q_z, pid = bwd_caculate_offsets(
+                seq_index,
+                H,
+                G,
+                SORT_BY_SEQ_LENGTH,
+                BROADCAST_Q,
+            )
+
+            begin_q = tl.load(Q_offsets + off_q_z)
+            end_q = tl.load(Q_offsets + off_q_z + 1)
+            start_n = pid * BLOCK_N1
+            start_m = pid * BLOCK_M2
+            off_h2 = off_h.to(tl.int64)
+            qlen = end_q - begin_q
+            if FUSED_QKV:
+                begin_k = begin_q
+                end_k = end_q
+                klen = qlen
+            else:
+                begin_k = tl.load(K_offsets + off_z)
+                end_k = tl.load(K_offsets + off_z + 1)
+                klen = end_k - begin_k
+
+            if start_n < klen:
+                # Wait for K, V ready
+                kv_buf_id, kv_phase = _get_bufidx_phase(0, NUM_BUFFERS_KV)
+                k_tile = tlx.local_view(k_tiles, kv_buf_id)
+                v_tile = tlx.local_view(v_tiles, kv_buf_id)
+                k_full = tlx.local_view(k_fulls, kv_buf_id)
+                v_full = tlx.local_view(v_fulls, kv_buf_id)
+                tlx.barrier_wait(k_full, kv_phase)
+                tlx.barrier_wait(v_full, kv_phase)
+
+                # Wait for dK, dV to be released
+                dkv_buf_id, _ = _get_bufidx_phase(0, NUM_BUFFERS_TMEM)
+                dk_tile = tlx.local_view(dk_tiles, dkv_buf_id)
+                dv_tile = tlx.local_view(dv_tiles, dkv_buf_id)
+                dk_full = tlx.local_view(dk_fulls, dkv_buf_id)
+                dv_full = tlx.local_view(dv_fulls, dkv_buf_id)
+
+                # Compute dK and dV for non-masked blocks.
+                # Q is reloaded for each block of M.
+
+                # BLOCK_N1 must be a multiple of BLOCK_M1, otherwise the code wouldn't work.
+                tl.static_assert(BLOCK_N1 % BLOCK_M1 == 0)
+
+                num_steps = _gdpa_bwd_tlx_compute_num_steps(
+                    qlen, start_n, BLOCK_M1, BLOCK_N1, WINDOW_SIZE
+                )
+
+                for i in tl.range(0, num_steps, 1, num_stages=0):
+                    q_buf_id, q_phase = _get_bufidx_phase(i, NUM_BUFFERS_Q)
+                    q_tile = tlx.local_view(q_tiles, q_buf_id)
+                    q_full = tlx.local_view(q_fulls, q_buf_id)
+                    q_empty = tlx.local_view(q_empties, q_buf_id)
+
+                    do_buf_id, do_phase = _get_bufidx_phase(i, NUM_BUFFERS_DO)
+                    do_tile = tlx.local_view(do_tiles, do_buf_id)
+                    do_full = tlx.local_view(do_fulls, do_buf_id)
+                    do_empty = tlx.local_view(do_empties, do_buf_id)
+
+                    tmem_buf_id, tmem_phase = _get_bufidx_phase(i, NUM_BUFFERS_TMEM)
+                    qk_tile = tlx.local_view(qk_tiles, tmem_buf_id)
+                    ppT_tile = tlx.local_view(ppT_tiles, tmem_buf_id)
+                    dpT_tile = tlx.local_view(dpT_tiles, tmem_buf_id)
+                    dsT_tile = tlx.local_view(dsT_tiles, tmem_buf_id)
+                    dq_tile = tlx.local_view(dq_tiles, tmem_buf_id)
+                    ppT_empty = tlx.local_view(ppT_empties, tmem_buf_id)
+                    dsT_empty = tlx.local_view(dsT_empties, tmem_buf_id)
+                    dq_empty = tlx.local_view(dq_empties, tmem_buf_id)
+                    qk_full = tlx.local_view(qk_fulls, tmem_buf_id)
+                    ppT_full = tlx.local_view(ppT_fulls, tmem_buf_id)
+                    dpT_full = tlx.local_view(dpT_fulls, tmem_buf_id)
+                    dsT_full = tlx.local_view(dsT_fulls, tmem_buf_id)
+                    dq_full = tlx.local_view(dq_fulls, tmem_buf_id)
+
+                    # Compute qkT = tl.dot(k, qT)
+                    tlx.barrier_wait(q_full, q_phase)
+                    tlx.barrier_wait(ppT_empty, tmem_phase ^ 1)
+                    qT = tlx.local_trans(q_tile)
+                    tlx.async_dot(
+                        k_tile,
+                        qT,
+                        qk_tile,
+                        use_acc=False,
+                        mBarriers=[qk_full],
+                    )
+
+                    # Compute dpT = tl.dot(v, tl.trans(do))
+                    tlx.barrier_wait(do_full, do_phase)
+                    tlx.barrier_wait(dsT_empty, tmem_phase ^ 1)
+                    doT = tlx.local_trans(do_tile)
+                    tlx.async_dot(
+                        v_tile,
+                        doT,
+                        dpT_tile,
+                        use_acc=False,
+                        mBarriers=[dpT_full],
+                    )
+
+                    # Compute dv += tl.dot(ppT, do)
+                    tlx.barrier_wait(ppT_full, tmem_phase)
+                    tlx.async_dot(
+                        ppT_tile,
+                        do_tile,
+                        dv_tile,
+                        use_acc=i > 0,
+                        mBarriers=[do_empty, ppT_empty],
+                    )
+
+                    # Compute dk += tl.dot(dsT, tl.trans(qT))
+                    tlx.barrier_wait(dsT_full, tmem_phase)
+                    tlx.async_dot(
+                        dsT_tile,
+                        q_tile,
+                        dk_tile,
+                        use_acc=i > 0,
+                        mBarriers=[q_empty],
+                    )
+
+                    # Compute dq = tl.dot(tl.trans(dsT), k)
+                    tlx.barrier_wait(dq_empty, tmem_phase ^ 1)
+                    dsT_view = tlx.local_trans(dsT_tile)
+                    tlx.async_dot(
+                        dsT_view,
+                        k_tile,
+                        dq_tile,
+                        use_acc=0,
+                        mBarriers=[dq_full, dsT_empty],
+                    )
+
+                # commit dk, dv
+                tlx.tcgen05_commit(dk_full)
+                tlx.tcgen05_commit(dv_full)
+
+        # load
+        with tlx.async_task(num_warps=1):
+            off_z, off_h, off_h_kv, off_q_z, pid = bwd_caculate_offsets(
+                seq_index,
+                H,
+                G,
+                SORT_BY_SEQ_LENGTH,
+                BROADCAST_Q,
+            )
+
+            begin_q = tl.load(Q_offsets + off_q_z)
+            end_q = tl.load(Q_offsets + off_q_z + 1)
+            start_n = pid * BLOCK_N1
+            start_m = pid * BLOCK_M2
+            off_h2 = off_h.to(tl.int64)
+            qlen = end_q - begin_q
+            if FUSED_QKV:
+                begin_k = begin_q
+                end_k = end_q
+                klen = qlen
+            else:
+                begin_k = tl.load(K_offsets + off_z)
+                end_k = tl.load(K_offsets + off_z + 1)
+                klen = end_k - begin_k
+
+            # Some of the ops are used for both producer and consumer, some are used by consumer
+            # Try to correctly specialize the IfOp by marking all ops.
+            # invert of start_n > klen and start_m > qlen
+            if start_n < klen:
+                # load K and V: they stay in SRAM throughout the inner loop.
+                kv_buf_id, kv_phase = _get_bufidx_phase(0, NUM_BUFFERS_KV)
+
+                # tlx.barrier_wait(k_empties[kv_buf_id], kv_phase)
+                k_tile = tlx.local_view(k_tiles, kv_buf_id)
+                v_tile = tlx.local_view(v_tiles, kv_buf_id)
+                k_full = tlx.local_view(k_fulls, kv_buf_id)
+                v_full = tlx.local_view(v_fulls, kv_buf_id)
+
+                tlx.barrier_expect_bytes(k_full, 2 * BLOCK_N1 * BLOCK_D)  # float16
+                tlx.async_descriptor_load(
+                    desc_k,
+                    k_tile,
+                    [
+                        (begin_k + start_n).to(tl.int32),
+                        (off_h_kv * stride_kh).to(tl.int32),
+                    ],
+                    k_full,
+                )
+
+                # tlx.barrier_wait(v_empties[kv_buf_id], kv_phase)
+                tlx.barrier_expect_bytes(v_full, 2 * BLOCK_N1 * BLOCK_D)  # float16
+                tlx.async_descriptor_load(
+                    desc_v,
+                    v_tile,
+                    [
+                        (begin_k + start_n).to(tl.int32),
+                        (off_h_kv * stride_kh).to(tl.int32),
+                    ],
+                    v_full,
+                )
+
+                curr_m = start_m
+                step_m = BLOCK_M1
+                num_steps = _gdpa_bwd_tlx_compute_num_steps(
+                    qlen, start_n, BLOCK_M1, BLOCK_N1, WINDOW_SIZE
+                )
+
+                for i in tl.range(0, num_steps, 1, loop_unroll_factor=1):
+                    q_buf_id, q_phase = _get_bufidx_phase(i, NUM_BUFFERS_Q)
+                    q_tile = tlx.local_view(q_tiles, q_buf_id)
+                    q_full = tlx.local_view(q_fulls, q_buf_id)
+                    q_empty = tlx.local_view(q_empties, q_buf_id)
+
+                    do_buf_id, do_phase = _get_bufidx_phase(i, NUM_BUFFERS_DO)
+                    do_tile = tlx.local_view(do_tiles, do_buf_id)
+                    do_full = tlx.local_view(do_fulls, do_buf_id)
+                    do_empty = tlx.local_view(do_empties, do_buf_id)
+
+                    tlx.barrier_wait(q_empty, q_phase ^ 1)
+                    tlx.barrier_expect_bytes(q_full, 2 * BLOCK_M1 * BLOCK_D)  # float16
+                    tlx.async_descriptor_load(
+                        desc_q,
+                        q_tile,
+                        [
+                            (begin_q + curr_m).to(tl.int32),
+                            (off_h2 * stride_qh).to(tl.int32),
+                        ],
+                        q_full,
+                    )
+
+                    # we may need this line for correctness
+                    # offs_m = curr_m + tl.arange(0, BLOCK_M1)
+                    # qmask = (offs_k[:, None] < HEAD_DIM) & (offs_m[None, :] < qlen)
+                    # qT = tl.where(qmask, qT, 0.0)
+
+                    # move dot ahead hoping to overlap with other computations
+                    tlx.barrier_wait(do_empty, do_phase ^ 1)
+                    tlx.barrier_expect_bytes(do_full, 2 * BLOCK_M1 * BLOCK_D)  # float16
+                    tlx.async_descriptor_load(
+                        desc_do,
+                        do_tile,
+                        [
+                            (begin_q + curr_m).to(tl.int32),
+                            (off_h2 * stride_qh).to(tl.int32),
+                        ],
+                        do_full,
+                    )
+
+                    # omask = (offs_m[:, None] < qlen) & (offs_k[None, :] < HEAD_DIM)
+                    # do = tl.where(omask, do, 0.0)
+
+                    # Increment pointers.
+                    curr_m += step_m

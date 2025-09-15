@@ -174,7 +174,7 @@ class Operator(BenchmarkOperator):
         self.kv_len = args.kv_len
 
     @register_benchmark(enabled=has_tlx())
-    def tlx_gdpa_fwd(
+    def tlx_gdpa(
         self,
         _config_name,
         jagged_q,
@@ -202,6 +202,7 @@ class Operator(BenchmarkOperator):
                 is_causal=False,
                 broadcast_q=jagged_data["broadcast_q"],
                 window_size=jagged_data["window_size"],
+                bwd_opt_tech="tlx",
             )
             return real_output
 

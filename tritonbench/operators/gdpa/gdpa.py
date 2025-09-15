@@ -27,6 +27,8 @@ import triton.language as tl  # @manual=//triton:triton
 from torch._library.triton import capture_triton
 from triton.tools.tensor_descriptor import TensorDescriptor
 
+from .gdpa_blackwell_tlx import gdpa_backward_tlx, get_tlx_bwd_autotune_config
+
 from .gdpa_utils import (
     custom_triton_op,
     get_autotune_kernel,
@@ -41,6 +43,16 @@ from .math import (
     gelu_grad,
     tanh_approx_fp32,
 )
+
+try:
+    # @manual=//triton:triton
+    import triton.language.extra.tlx as tlx  # type: ignore
+
+    HAS_TLX = True
+except ImportError:
+    # suppress type checking errors
+    tlx = None
+    HAS_TLX = False
 
 try:
     BF16_ATOMIC_ADD_SUPPORTED = torch.cuda.get_device_capability() >= (9, 0)
@@ -1070,10 +1082,19 @@ bwd_autotune_configs_ws = {
     "default": tuple(bwd_configs_ws),
 }
 
+bwd_autotune_configs_tlx = {
+    "default": tuple(get_tlx_bwd_autotune_config()),
+}
+
 
 @lru_cache
-def get_autotune_bwd_kernel(kernel, restore_value, enable_ws):
-    config_map = bwd_autotune_configs_ws if enable_ws else bwd_autotune_configs
+def get_autotune_bwd_kernel(kernel, restore_value, enable_ws, use_tlx):
+    if use_tlx:
+        config_map = bwd_autotune_configs_tlx
+    elif enable_ws:
+        config_map = bwd_autotune_configs_ws
+    else:
+        config_map = bwd_autotune_configs
     return get_autotune_kernel(
         kernel,
         list(
@@ -2090,6 +2111,7 @@ def _generalized_dot_product_attention_setup_context(ctx, inputs, output):
     ctx.use_dq_atomic_add = use_dq_atomic_add and "dq_atomic_add" in bwd_opt_tech
     ctx.qk_scale = qk_scale
     ctx.sort_by_seq_length = sort_by_seq_length
+    ctx.use_tlx = "tlx" in bwd_opt_tech
 
 
 @custom_triton_op(
@@ -2124,6 +2146,7 @@ def generalized_dot_product_attention_backward(
     enable_persistent: bool = False,
     enable_tma: bool = False,
     enable_ws: bool = False,
+    use_tlx: bool = False,
 ) -> Tuple[
     torch.Tensor,
     torch.Tensor,
@@ -2205,6 +2228,51 @@ def generalized_dot_product_attention_backward(
         BATCH,
     )
 
+    # TMA descriptors require a global memory allocation
+    def alloc_fn(size: int, alignment: int, _):
+        return torch.empty(size, device="cuda", dtype=torch.int8)
+
+    if use_tlx:
+        dummy_block = [1, 1]
+        desc_k = TensorDescriptor(
+            k,
+            shape=[N_CTX_KV * BATCH, HEAD_DIM * N_HEAD],
+            strides=[HEAD_DIM * N_HEAD, 1],
+            block_shape=dummy_block,
+        )
+        desc_v = TensorDescriptor(
+            v,
+            shape=[N_CTX_KV * BATCH, HEAD_DIM * N_HEAD],
+            strides=[HEAD_DIM * N_HEAD, 1],
+            block_shape=dummy_block,
+        )
+        desc_q = TensorDescriptor(
+            q,
+            shape=[N_CTX * BATCH, HEAD_DIM * N_HEAD],
+            strides=[HEAD_DIM * N_HEAD, 1],
+            block_shape=dummy_block,
+        )
+        desc_do = TensorDescriptor(
+            o,
+            shape=[N_CTX * BATCH, HEAD_DIM * N_HEAD],
+            strides=[HEAD_DIM * N_HEAD, 1],
+            block_shape=dummy_block,
+        )
+        desc_dq = TensorDescriptor(
+            dq,
+            shape=[N_CTX * BATCH, HEAD_DIM * N_HEAD],
+            strides=[HEAD_DIM * N_HEAD, 1],
+            block_shape=dummy_block,
+        )
+
+        triton.set_allocator(alloc_fn)
+    else:
+        desc_k = k
+        desc_v = v
+        desc_q = q
+        desc_do = do
+        desc_dq = dq
+
     restore_value = ()
     if use_start_end_offsets:
         if fused_kv:
@@ -2221,7 +2289,10 @@ def generalized_dot_product_attention_backward(
 
     kernel_grid = None
 
-    if enable_persistent:
+    if use_tlx:
+        kernel_fn = gdpa_backward_tlx
+        kernel_grid = grid
+    elif enable_persistent:
         kernel_fn = _gdpa_bwd_persistent
         kernel_grid = grid_persistent
     else:
@@ -2231,18 +2302,18 @@ def generalized_dot_product_attention_backward(
     bs = k_offsets.size(0) - 1
     L, _, _ = k.shape
     is_dense_kv = bs * N_CTX_KV == L
-    kernel_fn = get_autotune_bwd_kernel(kernel_fn, restore_value, enable_ws)
+    kernel_fn = get_autotune_bwd_kernel(kernel_fn, restore_value, enable_ws, use_tlx)
 
     kernel_info = capture_triton(kernel_fn)[kernel_grid](
-        q,
+        desc_q,
         q_offsets,
-        k,
+        desc_k,
         k_offsets,
-        v,
+        desc_v,
         seq_index,  #
-        do,
+        desc_do,
         output_offset,
-        dq,
+        desc_dq,  #
         dk,
         dv,  #
         q.stride(0),
@@ -2331,6 +2402,7 @@ def _generalized_dot_product_attention_backward(ctx, do):
         enable_persistent=ctx.enable_persistent,
         enable_tma=ctx.enable_tma,
         enable_ws=ctx.enable_ws,
+        use_tlx=ctx.use_tlx,
     )
     return (
         dq,
