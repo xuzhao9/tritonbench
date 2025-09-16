@@ -91,3 +91,16 @@ class Operator(BenchmarkOperator):
 
     def get_grad_to_none(self, args) -> List[torch.Tensor]:
         return [args[0]]
+
+    def accuracy(self, fn: Callable, baseline_fn: Callable) -> bool:
+        # Override default tolerances for bfloat16
+        output = fn()
+        baseline_output = baseline_fn()
+        rtol = self.tb_args.rtol if self.tb_args.rtol is not None else 0.05
+        atol = self.tb_args.atol if self.tb_args.atol is not None else 0.005
+
+        try:
+            torch.testing.assert_close(output, baseline_output, rtol=rtol, atol=atol)
+            return True
+        except AssertionError:
+            return False
