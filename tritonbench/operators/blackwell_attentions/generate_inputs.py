@@ -76,5 +76,5 @@ def fa3_paper_inputs(dtype, device) -> Generator:
     for BATCH in [32, 16, 8, 4, 2, 1]:
         N_CTX = 16384 // BATCH
         yield _generated_qkv_inputs(
-            shape=(BATCH, H, N_CTX, N_CTX, D_HEAD), dtype=dtype, device=device
+            shape=(BATCH, H, H, N_CTX, N_CTX, D_HEAD), dtype=dtype, device=device
         )

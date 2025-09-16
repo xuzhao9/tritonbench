@@ -93,8 +93,7 @@ HAS_CUDA_124 = (
     torch.cuda.is_available() and torch.version.cuda and torch.version.cuda >= "12.4"
 )
 
-IS_B200 = is_cuda() and get_nvidia_gpu_model() == "NVIDIA B200"
-
+IS_B200 = is_cuda() and "B200" in get_nvidia_gpu_model()
 
 CUSTOMIZED_SHAPES = "CUSTOMIZED_SHAPES"
 FA3_PAPER_SHAPES = "FA3_PAPER_SHAPES"
@@ -134,6 +133,29 @@ def parse_op_args(args: List[str]):
         help="specify input types",
     )
     return parser.parse_args(args)
+
+
+def _sdpa_cudnn_attention(q, k, v, is_causal=False, scale=False):
+    os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
+    with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
+        return sdpa(
+            q,
+            k,
+            v,
+            is_causal=is_causal,
+            scale=scale,
+        )
+
+
+def _is_sdpa_cudnn_attention_available():
+    q = torch.randn(1, 4, 8, 64, dtype=torch.bfloat16, device="cuda")
+    k = torch.empty_like(q)
+    v = torch.empty_like(q)
+    try:
+        _sdpa_cudnn_attention(q, k, v)
+        return True
+    except RuntimeError as e:
+        return False
 
 
 class Operator(BenchmarkOperator):
@@ -238,14 +260,18 @@ class Operator(BenchmarkOperator):
         v: torch.Tensor,
     ):
         q_1, k_1, v_1 = permute_qkv(q, k, v, perm=(0, 2, 1, 3))
+        # Make sure that inputs are contiguous
+        q_1 = q_1.contiguous()
+        k_1 = k_1.contiguous()
+        v_1 = v_1.contiguous()
         attn_bias = xformers.ops.LowerTriangularMask() if self.causal else None
         fhma_input = xformers_fmha.Inputs(
             query=q_1, key=k_1, value=v_1, attn_bias=attn_bias, scale=self.sm_scale
         )
         return fhma_input
 
-    @register_benchmark(enabled=HAS_XFORMERS)
-    def xformers(
+    @register_benchmark(enabled=HAS_XFORMERS, label="cutlass-blackwell")
+    def cutlass_blackwell(
         self,
         q: torch.Tensor,
         k: torch.Tensor,
@@ -253,7 +279,7 @@ class Operator(BenchmarkOperator):
     ) -> Callable:
         need_gradient = not (self.mode == BenchmarkMode.FWD_NO_GRAD)
         fhma_input = self.xformers_preprocess(q, k, v)
-        xformers_cutlass_fhma = xformers.ops.fmha.cutlass.FwOp
+        xformers_cutlass_fhma = xformers.ops.fmha.cutlass_blackwell.FwOp
         return lambda: xformers_cutlass_fhma().apply(
             fhma_input, needs_gradient=need_gradient
         )
@@ -273,29 +299,16 @@ class Operator(BenchmarkOperator):
         )
 
     @register_benchmark(
-        enabled=IS_B200, label=f"cudnn-sdpa-{torch.backends.cudnn.version()}"
+        enabled=IS_B200 and _is_sdpa_cudnn_attention_available(),
+        label=f"cudnn-sdpa-{torch.backends.cudnn.version()}",
     )
     def cudnn_sdpa(self, q, k, v):
-        os.environ["TORCH_CUDNN_SDPA_ENABLED"] = "1"
-
-        def sdpa_flash_attention(q, k, v):
-            with sdpa_kernel([SDPBackend.CUDNN_ATTENTION]):
-                return sdpa(
-                    q,
-                    k,
-                    v,
-                    is_causal=self.causal,
-                    scale=self.sm_scale,
-                )
-
-        return lambda: sdpa_flash_attention(
-            q,
-            k,
-            v,
+        return lambda: _sdpa_cudnn_attention(
+            q, k, v, is_causal=self.causal, scale=self.sm_scale
         )
 
     @register_benchmark(
-        enabled=(IS_B200 and HAS_FLASH_CUTE), label=f"cutedsl-blackwell", fwd_only=True
+        enabled=(IS_B200 and HAS_FLASH_CUTE), label="FAv4", fwd_only=True
     )
     def cutedsl_blackwell(
         self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
