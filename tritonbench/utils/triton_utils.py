@@ -49,3 +49,9 @@ def has_tlx():
     tlx_module = "triton.language.extra.tlx"
     spec = importlib.util.find_spec(tlx_module)
     return spec is not None
+
+
+def has_experimental_descriptor():
+    import triton.language as tl
+
+    return hasattr(getattr(tl, "tools", None), "experimental_descriptor")

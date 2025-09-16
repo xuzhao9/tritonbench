@@ -15,6 +15,8 @@ from tritonbench.utils.triton_op import (
     register_metric,
 )
 
+from tritonbench.utils.triton_utils import has_experimental_descriptor
+
 from .tutorial import matmul as tutorial_matmul
 
 logger = logging.getLogger(__name__)
@@ -175,7 +177,7 @@ class Operator(BenchmarkOperator):
     def triton_persistent_fp8_gemm(self, a, b, scale_a, scale_b):
         return lambda: matmul_persistent(a, b)
 
-    @register_benchmark(enabled=HAS_TMA)
+    @register_benchmark(enabled=HAS_TMA and has_experimental_descriptor())
     def triton_tma_persistent_fp8_gemm(self, a, b, scale_a, scale_b):
         b = b.T.contiguous()
         c, desc_a, desc_b, desc_c = allocate_matmul_tma(a, b)
