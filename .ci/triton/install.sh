@@ -4,7 +4,7 @@ set -xeuo pipefail
 
 # Print usage
 usage() {
-    echo "Usage: $0 --repo <repo-path> --commit <commit-hash> --side <a|b|single>"
+    echo "Usage: $0 --repo <repo-path> --commit <commit-hash> --side <a|b|single> --conda-env <env-name> --install-dir <triton-install-dir>"
     exit 1
 }
 
@@ -50,9 +50,11 @@ install_triton() {
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
+        --conda-env) CONDA_ENV="$2"; shift ;;
         --repo) REPO="$2"; shift ;;
         --commit) COMMIT="$2"; shift ;;
         --side) SIDE="$2"; shift ;;
+        --install-dir) TRITON_INSTALL_DIR="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; usage ;;
     esac
     shift
@@ -70,9 +72,8 @@ if [ -z "${REPO}" ] || [ -z "${COMMIT}" ] || [ -z "${SIDE}" ]; then
 fi
 
 if [ "${SIDE}" == "single" ]; then
-    TRITON_INSTALL_DIR=/workspace/triton
-    if [ -z "${CONDA_ENV}" ]; then
-        echo "Must specifify CONDA_ENV if running with --side single."
+    if [ -z "${CONDA_ENV}" ] || [ -z "${TRITON_INSTALL_DIR}" ]; then
+        echo "Must specifify --conda-env and --install-dir with --side single."
         exit 1
     fi
 elif [ "${SIDE}" == "a" ] || [ "${SIDE}" == "b" ]; then
@@ -100,7 +101,16 @@ install_triton "${TRITON_INSTALL_DIR}"
 # export Triton repo related envs
 # these envs will be used in nightly runs and other benchmarks
 cd "${TRITON_INSTALL_DIR}"
-TRITONBENCH_TRITON_COMMIT=$(git rev-parse --verify HEAD)
+TRITONBENCH_TRITON_COMMIT_HASH=$(git rev-parse --verify HEAD)
 TRITONBENCH_TRITON_REPO=$(git config --get remote.origin.url | sed -E 's|.*github.com[:/](.+)\.git|\1|')
-echo "export TRITONBENCH_TRITON_COMMIT=${TRITONBENCH_TRITON_COMMIT}" >> /workspace/setup_instance.sh
-echo "export TRITONBENCH_TRITON_REPO=${TRITONBENCH_TRITON_REPO}" >> /workspace/setup_instance.sh
+
+# If the current conda env matches the env we just created
+# then export all Triton related envs to shell env
+cat <<EOF >> /workspace/setup_instance.sh
+if [ \${CONDA_DEFAULT_ENV} == "${CONDA_ENV}" ] ; then
+    export TRITONBENCH_TRITON_COMMIT_HASH="${TRITONBENCH_TRITON_COMMIT_HASH}"
+    export TRITONBENCH_TRITON_REPO="${TRITONBENCH_TRITON_REPO}"
+    export TRITONBENCH_TRITON_COMMIT="${COMMIT}"
+    export TRITONBENCH_TRITON_INSTALL_DIR="${TRITON_INSTALL_DIR}"
+fi
+EOF
