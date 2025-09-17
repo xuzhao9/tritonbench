@@ -37,8 +37,11 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(baseline=True)
     def aten_grouped_mm(self, group_A, group_B):
-        A_packed, B_shared, offs = self.list_input_to_jagged(group_A, group_B)
-        return lambda: torch._grouped_mm(A_packed, B_shared, offs=offs, bias=None)
+        def _inner():
+            A_packed, B_shared, offs = self.list_input_to_jagged(group_A, group_B)
+            return torch._grouped_mm(A_packed, B_shared, offs=offs, bias=None)
+
+        return _inner
 
     @register_benchmark()
     def naive(self, group_A, group_B):
@@ -57,24 +60,26 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark()
     def pt2_triton_grouped_mm(self, group_A, group_B):
-        torch._dynamo.reset()
+        def _inner():
+            torch._dynamo.reset()
 
-        with inductor_config.patch(
-            max_autotune=True,
-            max_autotune_gemm_backends="TRITON",
-            autotune_fallback_to_aten=False,
-        ):
-            A_packed, B_shared, offs = self.list_input_to_jagged(group_A, group_B)
-            compiled = torch.compile(torch._grouped_mm, dynamic=False)
-            return lambda: compiled(A_packed, B_shared, offs=offs, bias=None)
+            with inductor_config.patch(
+                max_autotune=True,
+                max_autotune_gemm_backends="TRITON",
+                autotune_fallback_to_aten=False,
+            ):
+                A_packed, B_shared, offs = self.list_input_to_jagged(group_A, group_B)
+                compiled = torch.compile(torch._grouped_mm, dynamic=False)
+                return compiled(A_packed, B_shared, offs=offs, bias=None)
+
+        return _inner
 
     @register_benchmark()
     def triton(self, group_A, group_B):
-        (d_a_ptrs, d_b_ptrs, d_c_ptrs, d_g_sizes, d_g_lds, group_C) = (
-            self.list_input_to_triton_input(group_A, group_B)
-        )
-
         def _inner():
+            (d_a_ptrs, d_b_ptrs, d_c_ptrs, d_g_sizes, d_g_lds, group_C) = (
+                self.list_input_to_triton_input(group_A, group_B)
+            )
             outs = triton_group_gemm_fn(
                 d_a_ptrs,
                 d_b_ptrs,
@@ -91,39 +96,39 @@ class Operator(BenchmarkOperator):
 
     @register_benchmark(enabled=HAS_CUTEDSL and IS_B200)
     def cutedsl_grouped_mm(self, group_A, group_B):
-        (
-            compiled_grouped_gemm,
-            initial_cute_tensors_abc,
-            tensor_of_dim_size_mnkl,
-            tensor_of_strides_abc,
-            tensor_of_ptrs_abc,
-            tensor_of_tensormap,
-            current_stream,
-            torch_tensors_abc,
-        ) = compile_cutedsl_grouped_gemm(
-            group_A,
-            group_B,
-            ab_dtype=cutlass.Float16
-            if self.dtype == torch.float16
-            else cutlass.BFloat16,
-            c_dtype=cutlass.Float16
-            if self.dtype == torch.float16
-            else cutlass.BFloat16,
-            acc_dtype=cutlass.Float32,
-            a_major="m",
-            b_major="n",
-            c_major="m",
-            mma_tiler_mn=(128, 128),
-            cluster_shape_mn=(1, 1),
-            use_2cta_instrs=False,
-            tensormap_update_mode=utils.TensorMapUpdateMode.SMEM,
-            tolerance=0.5,
-            warmup_iterations=0,
-            iterations=1,
-            skip_ref_check=True,
-        )
-
         def _inner():
+            (
+                compiled_grouped_gemm,
+                initial_cute_tensors_abc,
+                tensor_of_dim_size_mnkl,
+                tensor_of_strides_abc,
+                tensor_of_ptrs_abc,
+                tensor_of_tensormap,
+                current_stream,
+                torch_tensors_abc,
+            ) = compile_cutedsl_grouped_gemm(
+                group_A,
+                group_B,
+                ab_dtype=cutlass.Float16
+                if self.dtype == torch.float16
+                else cutlass.BFloat16,
+                c_dtype=cutlass.Float16
+                if self.dtype == torch.float16
+                else cutlass.BFloat16,
+                acc_dtype=cutlass.Float32,
+                a_major="m",
+                b_major="n",
+                c_major="m",
+                mma_tiler_mn=(128, 128),
+                cluster_shape_mn=(1, 1),
+                use_2cta_instrs=False,
+                tensormap_update_mode=utils.TensorMapUpdateMode.SMEM,
+                tolerance=0.5,
+                warmup_iterations=0,
+                iterations=1,
+                skip_ref_check=True,
+            )
+
             compiled_grouped_gemm(
                 initial_cute_tensors_abc[0],
                 initial_cute_tensors_abc[1],
